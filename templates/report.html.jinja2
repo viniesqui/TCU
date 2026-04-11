@@ -1,0 +1,484 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>TCU – Análisis de Brecha Educativa: {{ gap_analysis.sector }}</title>
+  <style>
+    :root {
+      --primary: #1a3c6e;
+      --secondary: #2d6a9f;
+      --accent: #e8a020;
+      --critical: #c0392b;
+      --moderate: #e67e22;
+      --minor: #f1c40f;
+      --covered: #27ae60;
+      --bg: #f4f6f9;
+      --card: #ffffff;
+      --text: #2c3e50;
+      --muted: #7f8c8d;
+      --border: #dde3ea;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: 'Segoe UI', Arial, sans-serif; background: var(--bg); color: var(--text); line-height: 1.6; }
+
+    /* Header */
+    .header { background: linear-gradient(135deg, var(--primary), var(--secondary)); color: white; padding: 2.5rem 2rem; }
+    .header h1 { font-size: 1.8rem; margin-bottom: 0.4rem; }
+    .header p { opacity: 0.85; font-size: 0.95rem; }
+    .header .meta { display: flex; gap: 2rem; margin-top: 1rem; flex-wrap: wrap; }
+    .header .meta span { background: rgba(255,255,255,0.15); padding: 0.3rem 0.8rem; border-radius: 20px; font-size: 0.85rem; }
+
+    /* Navigation */
+    .toc { background: var(--primary); padding: 0.8rem 2rem; display: flex; gap: 0.5rem; flex-wrap: wrap; }
+    .toc a { color: rgba(255,255,255,0.8); text-decoration: none; font-size: 0.85rem; padding: 0.25rem 0.7rem; border-radius: 4px; transition: background 0.2s; }
+    .toc a:hover { background: rgba(255,255,255,0.2); color: white; }
+
+    /* Layout */
+    .container { max-width: 1100px; margin: 0 auto; padding: 2rem; }
+    .section { background: var(--card); border-radius: 8px; padding: 1.8rem; margin-bottom: 1.5rem; box-shadow: 0 1px 4px rgba(0,0,0,0.08); }
+    .section-title { font-size: 1.25rem; color: var(--primary); border-bottom: 3px solid var(--accent); padding-bottom: 0.5rem; margin-bottom: 1.2rem; display: flex; align-items: center; gap: 0.5rem; }
+    .section-title .icon { font-size: 1.1rem; }
+
+    /* Summary boxes */
+    .summary-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem; margin-bottom: 1.5rem; }
+    .stat-box { background: var(--bg); border-left: 4px solid var(--secondary); padding: 1rem; border-radius: 4px; }
+    .stat-box .num { font-size: 1.8rem; font-weight: bold; color: var(--secondary); }
+    .stat-box .label { font-size: 0.8rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.05em; }
+
+    /* Tables */
+    table { width: 100%; border-collapse: collapse; font-size: 0.9rem; margin-top: 0.8rem; }
+    th { background: var(--primary); color: white; padding: 0.6rem 0.9rem; text-align: left; font-weight: 600; font-size: 0.85rem; }
+    td { padding: 0.55rem 0.9rem; border-bottom: 1px solid var(--border); vertical-align: top; }
+    tr:hover td { background: #f0f4f8; }
+    tr:last-child td { border-bottom: none; }
+
+    /* Score bars */
+    .score-bar { display: flex; align-items: center; gap: 0.5rem; }
+    .bar { height: 8px; border-radius: 4px; background: #e0e0e0; flex: 1; max-width: 100px; overflow: hidden; }
+    .bar-fill { height: 100%; border-radius: 4px; }
+    .bar-fill.demand { background: var(--secondary); }
+    .bar-fill.coverage { background: var(--covered); }
+    .score-val { font-size: 0.8rem; color: var(--muted); min-width: 30px; }
+
+    /* Gap severity badges */
+    .badge { display: inline-block; padding: 0.2rem 0.55rem; border-radius: 12px; font-size: 0.75rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.03em; }
+    .badge.critical { background: #fdecea; color: var(--critical); border: 1px solid #f5c6cb; }
+    .badge.moderate { background: #fef3e7; color: var(--moderate); border: 1px solid #fcd69a; }
+    .badge.minor { background: #fefce0; color: #856404; border: 1px solid #fce96a; }
+    .badge.covered { background: #e9f7ef; color: var(--covered); border: 1px solid #a9dfbf; }
+
+    /* Course section */
+    .course-header { background: linear-gradient(135deg, #1a3c6e11, #2d6a9f11); border: 1px solid var(--secondary); border-radius: 8px; padding: 1.5rem; margin-bottom: 1.5rem; }
+    .course-title { font-size: 1.4rem; color: var(--primary); font-weight: bold; margin-bottom: 0.5rem; }
+    .course-meta { display: flex; flex-wrap: wrap; gap: 0.8rem; margin-top: 0.8rem; }
+    .course-meta-item { background: var(--primary); color: white; padding: 0.3rem 0.8rem; border-radius: 16px; font-size: 0.8rem; }
+
+    /* Bloom level colors */
+    .bloom-recordar { color: #8e44ad; font-weight: 600; }
+    .bloom-comprender { color: #2980b9; font-weight: 600; }
+    .bloom-aplicar { color: #16a085; font-weight: 600; }
+    .bloom-analizar { color: #e67e22; font-weight: 600; }
+    .bloom-evaluar { color: #c0392b; font-weight: 600; }
+    .bloom-crear { color: #27ae60; font-weight: 600; }
+
+    /* Activity type badges */
+    .act-lectura { background: #eaf4fb; color: #2980b9; }
+    .act-laboratorio { background: #eafaf1; color: #1e8449; }
+    .act-proyecto { background: #fef9e7; color: #b7950b; }
+    .act-debate { background: #f4ecf7; color: #7d3c98; }
+    .act-caso_estudio { background: #fef5e4; color: #ca6f1e; }
+    .act-evaluacion { background: #fdedec; color: #c0392b; }
+    .act-taller { background: #e8f8f5; color: #148f77; }
+
+    /* Evaluation weight bars */
+    .eval-grid { display: flex; flex-direction: column; gap: 0.7rem; }
+    .eval-row { display: flex; align-items: center; gap: 1rem; }
+    .eval-name { flex: 2; font-size: 0.9rem; }
+    .eval-weight-bar { flex: 3; height: 24px; background: #e0e0e0; border-radius: 4px; overflow: hidden; position: relative; }
+    .eval-weight-fill { height: 100%; background: linear-gradient(90deg, var(--secondary), var(--accent)); border-radius: 4px; display: flex; align-items: center; padding-left: 0.5rem; }
+    .eval-weight-text { font-size: 0.8rem; color: white; font-weight: bold; }
+    .eval-pct { flex: 0 0 40px; text-align: right; font-weight: bold; color: var(--primary); font-size: 0.9rem; }
+
+    /* Skills tags */
+    .tags { display: flex; flex-wrap: wrap; gap: 0.4rem; }
+    .tag { background: #eaf4fb; color: var(--secondary); border: 1px solid #aed6f1; padding: 0.15rem 0.55rem; border-radius: 12px; font-size: 0.78rem; }
+    .tag.critical-skill { background: #fdecea; color: var(--critical); border-color: #f5c6cb; }
+
+    /* Summary narrative */
+    .narrative { background: var(--bg); border-left: 4px solid var(--accent); padding: 1rem 1.2rem; border-radius: 0 4px 4px 0; font-style: italic; color: var(--text); margin-top: 1rem; }
+
+    /* Footer */
+    .footer { text-align: center; padding: 2rem; color: var(--muted); font-size: 0.82rem; border-top: 1px solid var(--border); margin-top: 2rem; }
+  </style>
+</head>
+<body>
+
+<div class="header">
+  <h1>TCU – Análisis de Brecha Educativa en Costa Rica</h1>
+  <p>Sistema de Agentes de IA para la Investigación y Diseño Curricular</p>
+  <div class="meta">
+    <span>Sector: {{ industry_demand.sector }}</span>
+    <span>Generado: {{ generated_date }}</span>
+    <span>{{ industry_demand.job_postings_sampled | length }} ofertas analizadas</span>
+    <span>{{ academic_landscape.curricula_sampled | length }} programas universitarios</span>
+  </div>
+</div>
+
+<nav class="toc">
+  <a href="#summary">Resumen</a>
+  <a href="#market">Mercado Laboral</a>
+  <a href="#academic">Oferta Académica</a>
+  <a href="#gap">Análisis de Brecha</a>
+  <a href="#course">Curso Propuesto</a>
+  <a href="#activities">Actividades</a>
+  <a href="#evaluation">Evaluación</a>
+</nav>
+
+<div class="container">
+
+  <!-- ===== EXECUTIVE SUMMARY ===== -->
+  <div class="section" id="summary">
+    <div class="section-title"><span class="icon">📊</span> Resumen Ejecutivo</div>
+    <div class="summary-grid">
+      <div class="stat-box">
+        <div class="num">{{ industry_demand.top_skills | length }}</div>
+        <div class="label">Habilidades demandadas</div>
+      </div>
+      <div class="stat-box">
+        <div class="num">{{ academic_landscape.curricula_sampled | length }}</div>
+        <div class="label">Programas analizados</div>
+      </div>
+      <div class="stat-box">
+        <div class="num">{{ gap_analysis.critical_gaps | length }}</div>
+        <div class="label">Brechas críticas</div>
+      </div>
+      <div class="stat-box">
+        <div class="num">{{ study_plan.total_weeks }}</div>
+        <div class="label">Semanas del curso</div>
+      </div>
+      <div class="stat-box">
+        <div class="num">{{ study_plan.credits }}</div>
+        <div class="label">Créditos propuestos</div>
+      </div>
+    </div>
+    <div class="narrative">{{ gap_analysis.opportunity_statement }}</div>
+  </div>
+
+  <!-- ===== LABOR MARKET ===== -->
+  <div class="section" id="market">
+    <div class="section-title"><span class="icon">💼</span> Necesidades del Mercado Laboral</div>
+    <p style="color: var(--muted); font-size: 0.88rem; margin-bottom: 1rem;">Fuentes: {{ industry_demand.market_sources | join(' · ') }}</p>
+
+    <table>
+      <thead>
+        <tr>
+          <th>Habilidad</th>
+          <th>Categoría</th>
+          <th>Demanda</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for skill in industry_demand.top_skills %}
+        <tr>
+          <td><strong>{{ skill.name }}</strong></td>
+          <td>{{ skill.category }}</td>
+          <td>
+            <div class="score-bar">
+              <div class="bar"><div class="bar-fill demand" style="width: {{ (skill.frequency_score * 100) | int }}%"></div></div>
+              <span class="score-val">{{ "%.0f" | format(skill.frequency_score * 100) }}%</span>
+            </div>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+
+    {% if industry_demand.summary %}
+    <div class="narrative">{{ industry_demand.summary }}</div>
+    {% endif %}
+  </div>
+
+  <!-- ===== ACADEMIC LANDSCAPE ===== -->
+  <div class="section" id="academic">
+    <div class="section-title"><span class="icon">🎓</span> Oferta Académica Universitaria</div>
+
+    <table>
+      <thead>
+        <tr>
+          <th>Universidad</th>
+          <th>Programa</th>
+          <th>Nivel</th>
+          <th>Tipo</th>
+          <th>Cursos clave</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for curr in academic_landscape.curricula_sampled %}
+        <tr>
+          <td><strong>{{ curr.university }}</strong></td>
+          <td>{{ curr.degree_name }}</td>
+          <td>{{ curr.degree_level | title }}</td>
+          <td>
+            {% if curr.is_public %}
+              <span class="badge covered">Pública</span>
+            {% else %}
+              <span class="badge moderate">Privada</span>
+            {% endif %}
+          </td>
+          <td>
+            <div class="tags">
+              {% for course in curr.courses[:4] %}
+                <span class="tag">{{ course.name }}</span>
+              {% endfor %}
+              {% if curr.courses | length > 4 %}
+                <span class="tag" style="background:#f0f0f0;color:#666;">+{{ curr.courses | length - 4 }} más</span>
+              {% endif %}
+            </div>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+
+    <div style="margin-top: 1.2rem;">
+      <strong style="color: var(--primary);">Habilidades cubiertas:</strong>
+      <div class="tags" style="margin-top: 0.5rem;">
+        {% for skill in academic_landscape.all_skills_covered %}
+          <span class="tag">{{ skill }}</span>
+        {% endfor %}
+      </div>
+    </div>
+
+    {% if academic_landscape.summary %}
+    <div class="narrative">{{ academic_landscape.summary }}</div>
+    {% endif %}
+  </div>
+
+  <!-- ===== GAP ANALYSIS ===== -->
+  <div class="section" id="gap">
+    <div class="section-title"><span class="icon">🔍</span> Análisis de Brecha</div>
+
+    {% if gap_analysis.critical_gaps %}
+    <h3 style="color: var(--critical); margin-bottom: 0.6rem; font-size: 1rem;">Brechas Críticas</h3>
+    <table>
+      <thead>
+        <tr><th>Habilidad</th><th>Demanda</th><th>Cobertura Académica</th><th>Severidad</th><th>Notas</th></tr>
+      </thead>
+      <tbody>
+        {% for gap in gap_analysis.critical_gaps %}
+        <tr>
+          <td><strong>{{ gap.skill_name }}</strong></td>
+          <td>
+            <div class="score-bar">
+              <div class="bar"><div class="bar-fill demand" style="width: {{ (gap.market_demand_score * 100) | int }}%"></div></div>
+              <span class="score-val">{{ "%.0f" | format(gap.market_demand_score * 100) }}%</span>
+            </div>
+          </td>
+          <td>
+            <div class="score-bar">
+              <div class="bar"><div class="bar-fill coverage" style="width: {{ (gap.academic_coverage_score * 100) | int }}%"></div></div>
+              <span class="score-val">{{ "%.0f" | format(gap.academic_coverage_score * 100) }}%</span>
+            </div>
+          </td>
+          <td><span class="badge {{ gap.gap_severity }}">{{ gap.gap_severity | upper }}</span></td>
+          <td style="font-size: 0.85rem; color: var(--muted);">{{ gap.notes }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% endif %}
+
+    {% if gap_analysis.moderate_gaps %}
+    <h3 style="color: var(--moderate); margin: 1.2rem 0 0.6rem; font-size: 1rem;">Brechas Moderadas</h3>
+    <table>
+      <thead>
+        <tr><th>Habilidad</th><th>Demanda</th><th>Cobertura</th><th>Severidad</th><th>Notas</th></tr>
+      </thead>
+      <tbody>
+        {% for gap in gap_analysis.moderate_gaps %}
+        <tr>
+          <td><strong>{{ gap.skill_name }}</strong></td>
+          <td>
+            <div class="score-bar">
+              <div class="bar"><div class="bar-fill demand" style="width: {{ (gap.market_demand_score * 100) | int }}%"></div></div>
+              <span class="score-val">{{ "%.0f" | format(gap.market_demand_score * 100) }}%</span>
+            </div>
+          </td>
+          <td>
+            <div class="score-bar">
+              <div class="bar"><div class="bar-fill coverage" style="width: {{ (gap.academic_coverage_score * 100) | int }}%"></div></div>
+              <span class="score-val">{{ "%.0f" | format(gap.academic_coverage_score * 100) }}%</span>
+            </div>
+          </td>
+          <td><span class="badge {{ gap.gap_severity }}">{{ gap.gap_severity | upper }}</span></td>
+          <td style="font-size: 0.85rem; color: var(--muted);">{{ gap.notes }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% endif %}
+
+    {% if gap_analysis.well_covered %}
+    <h3 style="color: var(--covered); margin: 1.2rem 0 0.6rem; font-size: 1rem;">Bien Cubiertos por el Sistema Universitario</h3>
+    <div class="tags">
+      {% for gap in gap_analysis.well_covered %}
+        <span class="tag" style="background:#e9f7ef; color:#1e8449; border-color:#a9dfbf;">{{ gap.skill_name }}</span>
+      {% endfor %}
+    </div>
+    {% endif %}
+
+    <div class="narrative" style="margin-top: 1.2rem;">
+      <strong>Curso propuesto:</strong> {{ gap_analysis.proposed_course_title }}<br/>
+      {{ gap_analysis.proposed_course_rationale }}
+    </div>
+  </div>
+
+  <!-- ===== PROPOSED COURSE ===== -->
+  <div class="section" id="course">
+    <div class="section-title"><span class="icon">📚</span> Curso Propuesto</div>
+
+    <div class="course-header">
+      <div class="course-title">{{ study_plan.course_title }}</div>
+      <div style="color: var(--muted); font-size: 0.9rem;">{{ study_plan.target_audience }}</div>
+      <div class="course-meta">
+        <span class="course-meta-item">Código: {{ study_plan.course_code }}</span>
+        <span class="course-meta-item">{{ study_plan.credits }} créditos</span>
+        <span class="course-meta-item">{{ study_plan.hours_per_week }} hrs/semana</span>
+        <span class="course-meta-item">{{ study_plan.total_weeks }} semanas</span>
+      </div>
+      {% if study_plan.prerequisites %}
+      <div style="margin-top: 0.8rem;">
+        <span style="font-size: 0.85rem; color: var(--muted);">Prerrequisitos: </span>
+        {% for prereq in study_plan.prerequisites %}
+          <span class="tag">{{ prereq }}</span>
+        {% endfor %}
+      </div>
+      {% endif %}
+    </div>
+
+    <h3 style="color: var(--primary); font-size: 1rem; margin-bottom: 0.8rem;">Objetivos de Aprendizaje</h3>
+    <table>
+      <thead>
+        <tr><th>#</th><th>Nivel (Bloom)</th><th>Objetivo</th></tr>
+      </thead>
+      <tbody>
+        {% for obj in study_plan.learning_objectives %}
+        <tr>
+          <td style="color: var(--muted); font-size: 0.85rem;">{{ loop.index }}</td>
+          <td><span class="bloom-{{ obj.bloom_level }}">{{ obj.bloom_level | upper }}</span></td>
+          <td>{{ obj.description }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+
+    {% if study_plan.bibliography %}
+    <h3 style="color: var(--primary); font-size: 1rem; margin: 1.2rem 0 0.6rem;">Bibliografía</h3>
+    <ul style="padding-left: 1.2rem; font-size: 0.88rem; line-height: 1.8;">
+      {% for ref in study_plan.bibliography %}
+      <li>{{ ref }}</li>
+      {% endfor %}
+    </ul>
+    {% endif %}
+  </div>
+
+  <!-- ===== LEARNING ACTIVITIES ===== -->
+  <div class="section" id="activities">
+    <div class="section-title"><span class="icon">📅</span> Cronograma de Actividades</div>
+
+    <table>
+      <thead>
+        <tr><th>Semana</th><th>Actividad</th><th>Tipo</th><th>Horas</th><th>Descripción</th></tr>
+      </thead>
+      <tbody>
+        {% for act in study_plan.weekly_schedule %}
+        <tr>
+          <td style="text-align: center; font-weight: bold; color: var(--secondary);">{{ act.week }}</td>
+          <td><strong>{{ act.title }}</strong></td>
+          <td>
+            <span class="badge act-{{ act.activity_type }}" style="font-size: 0.72rem;">
+              {{ act.activity_type | replace('_', ' ') | upper }}
+            </span>
+          </td>
+          <td style="text-align: center; color: var(--muted);">{{ act.estimated_hours }}h</td>
+          <td style="font-size: 0.85rem; color: var(--text);">{{ act.description }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+  <!-- ===== EVALUATION SYSTEM ===== -->
+  <div class="section" id="evaluation">
+    <div class="section-title"><span class="icon">✅</span> Sistema de Evaluación</div>
+
+    <div class="eval-grid" style="margin-bottom: 1.5rem;">
+      {% for comp in study_plan.evaluator.evaluation_components %}
+      <div class="eval-row">
+        <div class="eval-name">{{ comp.component }}</div>
+        <div class="eval-weight-bar">
+          <div class="eval-weight-fill" style="width: {{ comp.weight_percent | int }}%">
+            <span class="eval-weight-text">{{ comp.component | truncate(20, true, '…') }}</span>
+          </div>
+        </div>
+        <div class="eval-pct">{{ comp.weight_percent | int }}%</div>
+      </div>
+      {% endfor %}
+    </div>
+
+    <table>
+      <thead>
+        <tr><th>Componente</th><th>Peso</th><th>Criterios de Rúbrica</th><th>Mínimo aprobación</th></tr>
+      </thead>
+      <tbody>
+        {% for comp in study_plan.evaluator.evaluation_components %}
+        <tr>
+          <td><strong>{{ comp.component }}</strong></td>
+          <td style="text-align: center; font-weight: bold; color: var(--secondary);">{{ comp.weight_percent | int }}%</td>
+          <td>
+            <ul style="padding-left: 1rem; font-size: 0.85rem; line-height: 1.7;">
+              {% for item in comp.rubric_items %}
+              <li>{{ item }}</li>
+              {% endfor %}
+            </ul>
+          </td>
+          <td style="text-align: center;">{{ comp.passing_threshold | int }}/100</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+
+    {% if study_plan.evaluator.competency_matrix %}
+    <h3 style="color: var(--primary); font-size: 1rem; margin: 1.2rem 0 0.6rem;">Matriz de Competencias</h3>
+    <table>
+      <thead>
+        <tr><th>Habilidad / Competencia</th><th>Actividades que la desarrollan</th></tr>
+      </thead>
+      <tbody>
+        {% for skill, activities in study_plan.evaluator.competency_matrix.items() %}
+        <tr>
+          <td><strong>{{ skill }}</strong></td>
+          <td>
+            <div class="tags">
+              {% for activity in activities %}
+                <span class="tag">{{ activity }}</span>
+              {% endfor %}
+            </div>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% endif %}
+  </div>
+
+</div><!-- /container -->
+
+<div class="footer">
+  <p>TCU – Trabajo Comunal Universitario | Sistema Multi-Agente de IA | Generado el {{ generated_date }}</p>
+  <p style="margin-top: 0.3rem; opacity: 0.7;">Este reporte fue generado automáticamente por agentes de inteligencia artificial. Los datos reflejan información disponible públicamente.</p>
+</div>
+
+</body>
+</html>
