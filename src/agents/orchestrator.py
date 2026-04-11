@@ -38,7 +38,7 @@ from src.models.academic import AcademicLandscape
 from src.models.course_design import Evaluator, LearningActivity, StudyPlan
 from src.models.gap import GapAnalysis
 from src.models.market import IndustryDemand
-from src.quality.downstream_gates import ActivitiesGate, CurriculumGate, GapAnalysisGate
+from src.quality.downstream_gates import ActivitiesGate, CurriculumGate, EvaluatorGate, GapAnalysisGate
 from src.quality.research_gates import AcademicResearchGate, MarketResearchGate
 
 logger = logging.getLogger(__name__)
@@ -332,6 +332,7 @@ class Orchestrator:
     def _stage_evaluator(
         self, partial_plan: _PartialStudyPlan, activities: list[LearningActivity]
     ) -> Evaluator:
+        gate = EvaluatorGate()
         agent = EvaluatorAgent()
         # Build full context including activities for the evaluator
         full_dict = partial_plan.model_dump()
@@ -342,23 +343,37 @@ class Orchestrator:
         for attempt in range(1, self.max_retries + 2):
             logger.info(f"[Stage 6] Attempt {attempt}/{self.max_retries + 1}")
             try:
-                raw = agent.design(full_json)
+                raw = agent.design(full_json, retry_context=retry_context)
                 result = Evaluator.model_validate_json(BaseAgent.clean_json(raw))
-                # Pydantic already enforces weight sum = 100 — if we get here, it passed
-                self._quality_scores["evaluator"] = 1.0
-                return result
             except ValidationError as e:
                 logger.warning(f"[Stage 6] Validation error (weights?): {e}")
                 retry_context = (
-                    f"Error de validación: {e}. "
+                    f"Error de validación Pydantic: {e}. "
                     f"CRÍTICO: los weight_percent de todos los componentes DEBEN sumar exactamente 100."
                 )
                 if attempt > self.max_retries:
                     raise RuntimeError(f"Stage 6 failed after {attempt} attempts") from e
+                continue
             except Exception as e:
                 logger.warning(f"[Stage 6] Error: {e}")
+                retry_context = f"Tu respuesta anterior no fue JSON válido. Error: {e}. Responde solo con JSON."
                 if attempt > self.max_retries:
                     raise RuntimeError(f"Stage 6 failed after {attempt} attempts") from e
+                continue
+
+            # Run quality gate on the content
+            gate_result = gate.evaluate(result)
+            self._quality_scores["evaluator"] = gate_result.score
+            self._log_gate(gate_result)
+
+            if gate_result.passed:
+                return result
+
+            if attempt > self.max_retries:
+                logger.warning("[Stage 6] Quality gate failed after all retries. Proceeding with best result.")
+                return result
+
+            retry_context = gate_result.retry_instructions
 
         raise RuntimeError("Stage 6: unreachable")
 

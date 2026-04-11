@@ -10,28 +10,28 @@ Each prompt ends with strict JSON-only output instructions.
 
 _INDUSTRY_DEMAND_SCHEMA = """
 {
-  "sector": "string (ej: 'Software Development')",
+  "sector": "string (ej: 'Desarrollo de Software')",
   "top_skills": [
     {
       "name": "string",
       "category": "technical|soft|tool|language|certification",
-      "frequency_score": 0.0-1.0,
-      "example_sources": ["url1", "url2"]
+      "frequency_score": 0.85,
+      "example_sources": ["https://ejemplo.com/oferta1"]
     }
   ],
   "job_postings_sampled": [
     {
       "title": "string",
       "company": "string o null",
-      "source_url": "string",
-      "required_skills": [...],
-      "preferred_skills": [...],
+      "source_url": "https://...",
+      "required_skills": ["skill1", "skill2"],
+      "preferred_skills": ["skill3"],
       "seniority": "junior|mid|senior|lead|any",
-      "location": "string"
+      "location": "San José, Costa Rica"
     }
   ],
-  "market_sources": ["url o nombre de fuente"],
-  "research_date": "YYYY-MM-DD",
+  "market_sources": ["https://url-fuente.com"],
+  "research_date": "2025-01-15",
   "summary": "Párrafo narrativo en español resumiendo hallazgos del mercado"
 }
 """
@@ -43,22 +43,22 @@ _ACADEMIC_LANDSCAPE_SCHEMA = """
       "degree_name": "string",
       "degree_level": "bachillerato|licenciatura|maestria|tecnico|diplomado",
       "university": "string",
-      "is_public": true|false,
-      "url": "string o null",
+      "is_public": true,
+      "url": "https://universidad.ac.cr/carrera o null",
       "courses": [
         {
-          "code": "string o null",
+          "code": "CI-1234 o null",
           "name": "string",
-          "credits": número o null,
+          "credits": 3,
           "skills_taught": ["habilidad1", "habilidad2"],
           "description": "string o null"
         }
       ],
-      "last_updated": "string o null"
+      "last_updated": "2024 o null"
     }
   ],
   "all_skills_covered": ["lista plana y deduplicada de habilidades enseñadas"],
-  "research_date": "YYYY-MM-DD",
+  "research_date": "2025-01-15",
   "summary": "Párrafo narrativo en español resumiendo la oferta académica"
 }
 """
@@ -69,14 +69,30 @@ _GAP_ANALYSIS_SCHEMA = """
   "critical_gaps": [
     {
       "skill_name": "string",
-      "market_demand_score": 0.0-1.0,
-      "academic_coverage_score": 0.0-1.0,
+      "market_demand_score": 0.85,
+      "academic_coverage_score": 0.10,
       "gap_severity": "critical",
+      "notes": "Explicación breve del por qué es crítica"
+    }
+  ],
+  "moderate_gaps": [
+    {
+      "skill_name": "string",
+      "market_demand_score": 0.60,
+      "academic_coverage_score": 0.40,
+      "gap_severity": "moderate",
       "notes": "Explicación breve"
     }
   ],
-  "moderate_gaps": [...misma estructura...],
-  "well_covered": [...misma estructura, gap_severity: "covered"...],
+  "well_covered": [
+    {
+      "skill_name": "string",
+      "market_demand_score": 0.70,
+      "academic_coverage_score": 0.85,
+      "gap_severity": "covered",
+      "notes": "Bien cubierto en múltiples programas"
+    }
+  ],
   "opportunity_statement": "Narrativa en español justificando un nuevo curso",
   "proposed_course_title": "Título propuesto para el curso",
   "proposed_course_rationale": "Párrafo en español explicando el curso propuesto"
@@ -159,7 +175,10 @@ PROCESO DE INVESTIGACIÓN:
 6. Documenta al menos 3-5 ofertas de trabajo reales como ejemplos
 
 REGLAS DE CALIDAD:
-- Asigna frequency_score basándote en cuántas veces aparece la habilidad (1.0 = aparece en >80% de ofertas)
+- Calcula frequency_score con esta fórmula exacta:
+    frequency_score = (número de ofertas que mencionan esta habilidad) / (total de ofertas analizadas)
+    Ejemplo: si analizaste 10 ofertas y Python aparece en 8 → frequency_score = 0.80
+    Redondea a 2 decimales. NUNCA estimes sin contar. Mínimo 5 ofertas para calcular un score confiable.
 - Incluye URLs reales de las fuentes consultadas
 - Usa la fecha actual en research_date
 - El summary debe ser un párrafo informativo y útil en español
@@ -197,9 +216,14 @@ PROCESO DE INVESTIGACIÓN:
 5. Compila una lista deduplicada de TODAS las habilidades cubiertas por el sistema universitario
 
 REGLAS DE CALIDAD:
-- Incluye al menos 3 universidades (mezcla de públicas y privadas)
+- Incluye al menos 5 universidades (mezcla de públicas y privadas)
 - Para cada programa, lista al menos 5-8 cursos representativos
 - all_skills_covered debe ser una lista plana y deduplicada de todas las habilidades
+- Normaliza los nombres de habilidades en all_skills_covered:
+    * Usa minúsculas y forma singular: "Python" y "Python 3" → "python"
+    * Elimina calificadores: "Programación Orientada a Objetos en Java" → "programación orientada a objetos"
+    * Nombres cortos y consistentes: "docker", "spring boot", "bases de datos relacionales"
+    * Deduplica ANTES de incluir en la lista (no puede haber dos entradas para la misma habilidad)
 - El summary debe contrastar la oferta pública vs privada en español
 
 FORMATO DE RESPUESTA: Responde ÚNICAMENTE con JSON válido. Sin texto adicional. Sin bloques de código markdown. Solo el objeto JSON puro.
@@ -258,6 +282,22 @@ ESTÁNDARES UNIVERSITARIOS COSTA RICA:
 - 1 crédito = 3 horas estudiante por semana (1 hora lectiva + 2 horas independientes)
 - Los objetivos deben comenzar con verbos de acción de Bloom
 
+VERBOS DE BLOOM POR NIVEL (usa estos verbos exactos o similares):
+- recordar:    identificar, listar, nombrar, reconocer, definir, describir
+- comprender:  explicar, interpretar, resumir, clasificar, comparar, distinguir
+- aplicar:     usar, ejecutar, implementar, demostrar, calcular, construir
+- analizar:    diferenciar, organizar, examinar, descomponer, contrastar, inferir
+- evaluar:     juzgar, criticar, justificar, seleccionar, priorizar, argumentar
+- crear:       diseñar, construir, planificar, producir, formular, desarrollar
+
+EJEMPLOS DE OBJETIVOS BIEN REDACTADOS:
+- (recordar)    "Identificar los principales algoritmos de ordenamiento y sus complejidades."
+- (comprender)  "Explicar el funcionamiento del protocolo HTTPS y su rol en la seguridad web."
+- (aplicar)     "Implementar una API RESTful usando FastAPI con autenticación JWT."
+- (analizar)    "Comparar distintas arquitecturas de microservicios según criterios de escalabilidad."
+- (evaluar)     "Justificar la elección de una base de datos SQL vs NoSQL para un caso de uso dado."
+- (crear)       "Diseñar e implementar un sistema de backend completo para una aplicación web real."
+
 FORMATO DE RESPUESTA: Responde ÚNICAMENTE con JSON válido. Sin texto adicional. Sin bloques de código markdown. Solo el objeto JSON puro.
 
 ESQUEMA REQUERIDO:
@@ -300,23 +340,41 @@ EVALUATOR_PROMPT = f"""Eres un experto en evaluación del aprendizaje y diseño 
 TU MISIÓN: Diseñar el sistema de evaluación completo para el curso, incluyendo los componentes, pesos, rúbricas y una matriz de competencias.
 
 PROCESO DE DISEÑO:
-1. Define 4-6 componentes de evaluación que sumen exactamente 100%
-   Estructura típica para cursos tecnológicos en Costa Rica:
-   - Laboratorios/Tareas: 20-25%
-   - Examen Parcial 1: 15-20%
-   - Proyecto Integrador: 25-30%
-   - Examen Parcial 2 o Final: 20-25%
-   - Participación/Debates: 5-10%
+1. Elige la estructura de evaluación más adecuada para el tipo de curso. Opciones:
+
+   OPCIÓN A – Orientada a proyectos (recomendada para cursos de desarrollo/programación):
+   - Laboratorios/Tareas: 25%
+   - Proyecto Integrador: 35%
+   - Examen Parcial: 15%
+   - Examen Final: 20%
+   - Participación: 5%
+
+   OPCIÓN B – Balanceada (para cursos con igual peso teórico y práctico):
+   - Tareas: 20%
+   - Examen Parcial 1: 20%
+   - Proyecto: 25%
+   - Examen Final: 25%
+   - Participación: 10%
+
+   OPCIÓN C – Orientada a exámenes (para cursos teórico-conceptuales):
+   - Tareas: 15%
+   - Examen Parcial 1: 25%
+   - Examen Parcial 2: 25%
+   - Examen Final: 30%
+   - Participación: 5%
+
+   Puedes adaptar los porcentajes según el curso, pero TODOS deben sumar exactamente 100.
+   Ningún componente individual puede superar el 40%.
 
 2. Para cada componente:
    - Nombre claro y descriptivo
    - Peso en porcentaje (todos DEBEN sumar exactamente 100)
-   - 3-5 criterios de rúbrica específicos y medibles
+   - 3-5 criterios de rúbrica específicos, observables y medibles
    - Umbral mínimo de aprobación (típicamente 70 en sistema costarricense)
 
 3. Crea la matriz de competencias:
    - Para cada habilidad clave del curso, lista qué actividades la desarrollan
-   - Usa los títulos exactos de las actividades del cronograma recibido
+   - Usa los títulos EXACTOS de las actividades del cronograma recibido
 
 ESTÁNDARES EVALUATIVOS COSTA RICA:
 - Escala de notas: 0-100, mínimo para aprobar: 70

@@ -16,14 +16,23 @@ class EvaluatorAgent(BaseAgent):
             tools=[],  # No tools — pure reasoning
         )
 
-    def design(self, full_plan_json: str) -> str:
+    def design(self, full_plan_json: str, retry_context: str | None = None) -> str:
         """
         Design the evaluation system for the course.
         Args:
             full_plan_json: serialized StudyPlan with weekly_schedule included
+            retry_context: optional feedback from a previous failed attempt
         Returns raw JSON string matching Evaluator schema.
         """
+        prefix = ""
+        if retry_context:
+            prefix = (
+                f"CORRECCIONES REQUERIDAS (intento anterior rechazado):\n"
+                f"{retry_context}\n\n"
+                f"Aplica estas correcciones en tu nueva respuesta.\n\n"
+            )
         user_message = (
+            f"{prefix}"
             f"Diseña el sistema de evaluación completo para este curso universitario. "
             f"Define los componentes de evaluación (que sumen exactamente 100%), "
             f"crea rúbricas detalladas para cada componente, "

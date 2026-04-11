@@ -10,7 +10,7 @@ so no additional gate is needed there.
 
 from __future__ import annotations
 
-from src.models.course_design import LearningActivity, LearningObjective
+from src.models.course_design import Evaluator, LearningActivity, LearningObjective
 from src.models.gap import GapAnalysis
 from src.quality.base_gate import QualityGate, QualityResult
 
@@ -49,13 +49,13 @@ class GapAnalysisGate(QualityGate):
         if data.critical_gaps:
             bad_critical = [
                 g for g in data.critical_gaps
-                if g.market_demand_score < 0.4 or g.academic_coverage_score > 0.5
+                if g.market_demand_score < 0.6 or g.academic_coverage_score > 0.2
             ]
             if bad_critical:
                 names = ", ".join(g.skill_name for g in bad_critical[:3])
                 issues.append(
                     f"Algunas brechas marcadas como 'críticas' no tienen scores consistentes "
-                    f"({names}). Una brecha crítica debe tener demanda >= 0.4 y cobertura <= 0.5."
+                    f"({names}). Una brecha crítica debe tener demanda >= 0.6 y cobertura <= 0.2."
                 )
         score_components.append(1.0 if not data.critical_gaps or not issues else 0.5)
 
@@ -138,7 +138,7 @@ class CurriculumGate(QualityGate):
 
         # --- Check: objectives count ---
         obj_count = len(objectives)
-        if obj_count < 4:
+        if obj_count < 6:
             issues.append(
                 f"Solo {obj_count} objetivos de aprendizaje (mínimo recomendado: 6). "
                 f"Un curso universitario de un semestre necesita objetivos más comprehensivos."
@@ -169,10 +169,11 @@ class CurriculumGate(QualityGate):
         if credits > 0 and hours_per_week > 0:
             expected_hours = credits * 3
             ratio = hours_per_week / expected_hours
-            if ratio < 0.5 or ratio > 2.5:
+            if ratio < 0.8 or ratio > 1.2:
                 issues.append(
                     f"Las horas por semana ({hours_per_week}) parecen inconsistentes con "
-                    f"{credits} créditos. Estándar CR: 1 crédito ≈ 3 horas estudiante/semana."
+                    f"{credits} créditos. Estándar CR: 1 crédito ≈ 3 horas estudiante/semana "
+                    f"(esperado: {expected_hours} hrs/semana ±20%)."
                 )
             score_components.append(min(ratio if ratio <= 1 else 1 / ratio, 1.0))
         else:
@@ -326,5 +327,98 @@ class ActivitiesGate(QualityGate):
             "- Progresión: semanas 1-3 (fundamentos) → 4-10 (práctica) → 11-15 (proyecto) → 16 (evaluación).",
             "- Horas por actividad: lecturas 1-3h, laboratorios 2-4h, proyectos 4-8h.",
             "- Incluye al menos 2 evaluaciones formales y 2 proyectos prácticos.",
+        ]
+        return "\n".join(lines)
+
+
+class EvaluatorGate(QualityGate):
+    """
+    Validates the evaluation system design for pedagogical soundness.
+
+    Checks:
+    - Component count is between 4 and 7
+    - No single component exceeds 40% weight
+    - Every component has at least 3 rubric items
+    - Competency matrix is non-empty
+    """
+
+    MIN_COMPONENTS = 4
+    MAX_COMPONENTS = 7
+    MAX_SINGLE_WEIGHT = 40.0
+    MIN_RUBRIC_ITEMS = 3
+
+    @property
+    def gate_name(self) -> str:
+        return "EvaluatorGate"
+
+    def evaluate(self, data: Evaluator) -> QualityResult:
+        issues: list[str] = []
+        score_components: list[float] = []
+
+        comp_count = len(data.evaluation_components)
+
+        # --- Check: component count ---
+        if comp_count < self.MIN_COMPONENTS:
+            issues.append(
+                f"Solo {comp_count} componentes de evaluación. "
+                f"Se necesitan entre {self.MIN_COMPONENTS} y {self.MAX_COMPONENTS} componentes."
+            )
+        elif comp_count > self.MAX_COMPONENTS:
+            issues.append(
+                f"{comp_count} componentes de evaluación es demasiados. "
+                f"Mantén entre {self.MIN_COMPONENTS} y {self.MAX_COMPONENTS}."
+            )
+        score_components.append(
+            1.0 if self.MIN_COMPONENTS <= comp_count <= self.MAX_COMPONENTS else 0.4
+        )
+
+        # --- Check: no single component over 40% ---
+        heavy = [c for c in data.evaluation_components if c.weight_percent > self.MAX_SINGLE_WEIGHT]
+        if heavy:
+            names = ", ".join(f"'{c.component}' ({c.weight_percent}%)" for c in heavy)
+            issues.append(
+                f"Componente(s) con peso excesivo: {names}. "
+                f"Ningún componente debe superar el {self.MAX_SINGLE_WEIGHT:.0f}%."
+            )
+        score_components.append(0.0 if heavy else 1.0)
+
+        # --- Check: rubric items per component ---
+        thin = [
+            c for c in data.evaluation_components
+            if len(c.rubric_items) < self.MIN_RUBRIC_ITEMS
+        ]
+        if thin:
+            names = ", ".join(f"'{c.component}'" for c in thin)
+            issues.append(
+                f"Componente(s) con rúbrica insuficiente: {names}. "
+                f"Cada componente necesita al menos {self.MIN_RUBRIC_ITEMS} criterios de rúbrica."
+            )
+        score_components.append(1.0 if not thin else max(0.4, 1 - len(thin) / comp_count))
+
+        # --- Check: competency matrix non-empty ---
+        if not data.competency_matrix:
+            issues.append(
+                "La matriz de competencias está vacía. "
+                "Mapea las habilidades clave del curso a las actividades que las desarrollan."
+            )
+        score_components.append(1.0 if data.competency_matrix else 0.3)
+
+        overall_score = sum(score_components) / len(score_components) if score_components else 0.0
+        return self._result(issues, overall_score)
+
+    def _build_retry_instructions(self, issues: list[str]) -> str:
+        lines = [
+            "INSTRUCCIONES DE MEJORA (sistema de evaluación con problemas):",
+            "",
+        ]
+        lines += [f"- {issue}" for issue in issues]
+        lines += [
+            "",
+            "REGLAS DE EVALUACIÓN UNIVERSITARIA COSTA RICA:",
+            f"- Entre {self.MIN_COMPONENTS} y {self.MAX_COMPONENTS} componentes de evaluación.",
+            f"- Ningún componente individual puede superar el {self.MAX_SINGLE_WEIGHT:.0f}% del total.",
+            f"- Cada componente debe tener al menos {self.MIN_RUBRIC_ITEMS} criterios de rúbrica observables.",
+            "- Todos los weight_percent DEBEN sumar exactamente 100.",
+            "- La matriz de competencias debe listar las habilidades clave y las actividades del cronograma que las desarrollan.",
         ]
         return "\n".join(lines)

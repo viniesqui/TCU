@@ -164,6 +164,14 @@
         <div class="label">Brechas críticas</div>
       </div>
       <div class="stat-box">
+        <div class="num">{{ gap_analysis.moderate_gaps | length }}</div>
+        <div class="label">Brechas moderadas</div>
+      </div>
+      <div class="stat-box">
+        <div class="num">{{ study_plan.weekly_schedule | length }}</div>
+        <div class="label">Actividades del curso</div>
+      </div>
+      <div class="stat-box">
         <div class="num">{{ study_plan.total_weeks }}</div>
         <div class="label">Semanas del curso</div>
       </div>
@@ -178,12 +186,26 @@
     <div style="margin-top: 1.2rem;">
       <strong style="font-size: 0.85rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.05em;">Calidad de investigación (gates automáticos)</strong>
       <div class="quality-grid">
+        {% set stage_labels = {
+          'market_research': 'Mercado Laboral',
+          'academic_research': 'Oferta Académica',
+          'gap_analysis': 'Análisis de Brecha',
+          'curriculum': 'Plan de Estudios',
+          'activities': 'Actividades',
+          'evaluator': 'Evaluación'
+        } %}
         {% for stage, score in quality_scores.items() %}
         {% set pct = (score * 100) | int %}
-        <div class="quality-item">
-          <div class="quality-dot {% if pct >= 75 %}q-good{% elif pct >= 50 %}q-warn{% else %}q-poor{% endif %}"></div>
-          <span class="quality-label">{{ stage | replace('_', ' ') | title }}:</span>
-          <span class="quality-score">{{ pct }}%</span>
+        {% set label = stage_labels.get(stage, stage | replace('_', ' ') | title) %}
+        <div class="quality-item" style="flex-direction: column; align-items: flex-start; min-width: 150px;">
+          <div style="display: flex; align-items: center; gap: 0.4rem; width: 100%;">
+            <div class="quality-dot {% if pct >= 75 %}q-good{% elif pct >= 50 %}q-warn{% else %}q-poor{% endif %}"></div>
+            <span class="quality-label">{{ label }}</span>
+            <span class="quality-score" style="margin-left: auto;">{{ pct }}%</span>
+          </div>
+          <div style="height: 4px; background: #e0e0e0; border-radius: 2px; width: 100%; margin-top: 0.3rem; overflow: hidden;">
+            <div style="height: 100%; width: {{ pct }}%; background: {% if pct >= 75 %}var(--covered){% elif pct >= 50 %}var(--moderate){% else %}var(--critical){% endif %}; border-radius: 2px;"></div>
+          </div>
         </div>
         {% endfor %}
       </div>
@@ -194,7 +216,17 @@
   <!-- ===== LABOR MARKET ===== -->
   <div class="section" id="market">
     <div class="section-title"><span class="icon">💼</span> Necesidades del Mercado Laboral</div>
-    <p style="color: var(--muted); font-size: 0.88rem; margin-bottom: 1rem;">Fuentes: {{ industry_demand.market_sources | join(' · ') }}</p>
+    <p style="color: var(--muted); font-size: 0.88rem; margin-bottom: 1rem;">
+      Fuentes consultadas:
+      {% for source in industry_demand.market_sources %}
+        {% if source.startswith('http') %}
+          <a href="{{ source }}" target="_blank" rel="noopener" style="color: var(--secondary); font-size: 0.82rem;">{{ source }}</a>
+        {% else %}
+          <span style="font-size: 0.82rem;">{{ source }}</span>
+        {% endif %}
+        {% if not loop.last %} · {% endif %}
+      {% endfor %}
+    </p>
 
     <table>
       <thead>
@@ -268,12 +300,31 @@
     </table>
 
     <div style="margin-top: 1.2rem;">
-      <strong style="color: var(--primary);">Habilidades cubiertas:</strong>
-      <div class="tags" style="margin-top: 0.5rem;">
-        {% for skill in academic_landscape.all_skills_covered %}
-          <span class="tag">{{ skill }}</span>
+      <strong style="color: var(--primary);">
+        Habilidades cubiertas
+        <span style="font-size: 0.8rem; font-weight: normal; color: var(--muted);">({{ academic_landscape.all_skills_covered | length }} en total)</span>:
+      </strong>
+      {% if skills_by_category %}
+        {% for category, skills in skills_by_category.items() %}
+        <div style="margin-top: 0.8rem;">
+          <div style="font-size: 0.78rem; font-weight: 600; color: var(--secondary); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 0.3rem;">
+            {{ category }}
+            <span style="font-weight: normal; color: var(--muted);">({{ skills | length }})</span>
+          </div>
+          <div class="tags">
+            {% for skill in skills %}
+              <span class="tag">{{ skill }}</span>
+            {% endfor %}
+          </div>
+        </div>
         {% endfor %}
-      </div>
+      {% else %}
+        <div class="tags" style="margin-top: 0.5rem;">
+          {% for skill in academic_landscape.all_skills_covered %}
+            <span class="tag">{{ skill }}</span>
+          {% endfor %}
+        </div>
+      {% endif %}
     </div>
 
     {% if academic_landscape.summary %}
@@ -415,7 +466,7 @@
 
     <table>
       <thead>
-        <tr><th>Semana</th><th>Actividad</th><th>Tipo</th><th>Horas</th><th>Descripción</th></tr>
+        <tr><th>Semana</th><th>Actividad</th><th>Tipo</th><th>Horas</th><th>Objetivos</th><th>Descripción</th></tr>
       </thead>
       <tbody>
         {% for act in study_plan.weekly_schedule %}
@@ -428,6 +479,13 @@
             </span>
           </td>
           <td style="text-align: center; color: var(--muted);">{{ act.estimated_hours }}h</td>
+          <td style="white-space: nowrap;">
+            {% for obj_idx in act.learning_objectives_addressed %}
+              <span class="badge" style="background:#eaf4fb;color:#2980b9;border-color:#aed6f1;font-size:0.68rem;margin:1px 1px 1px 0;">
+                OBJ {{ obj_idx + 1 }}
+              </span>
+            {% endfor %}
+          </td>
           <td style="font-size: 0.85rem; color: var(--text);">{{ act.description }}</td>
         </tr>
         {% endfor %}

@@ -14,11 +14,13 @@ Uso:
 import argparse
 import logging
 import sys
+import webbrowser
 from pathlib import Path
 
 from rich.console import Console
 from rich.panel import Panel
 from rich.progress import Progress, SpinnerColumn, TextColumn, TimeElapsedColumn
+from rich.table import Table
 from rich.text import Text
 
 console = Console()
@@ -61,6 +63,54 @@ def setup_logging(verbose: bool) -> None:
         logging.getLogger(noisy).setLevel(logging.WARNING)
 
 
+class _RichProgressAdapter:
+    """Adapts the Rich Progress object for use as an Orchestrator progress callback."""
+
+    def __init__(self, rich_progress: Progress, task_id: object) -> None:
+        self._progress = rich_progress
+        self._task_id = task_id
+
+    def log(self, message: str) -> None:
+        self._progress.update(self._task_id, description=message)
+
+
+def _print_quality_scores(quality_scores: dict) -> None:
+    """Print a quality scores summary table to the console."""
+    if not quality_scores:
+        return
+
+    table = Table(title="Calidad de Investigación (Gates Automáticos)", show_header=True)
+    table.add_column("Etapa", style="bold")
+    table.add_column("Puntuación", justify="right")
+    table.add_column("Estado", justify="center")
+
+    stage_names = {
+        "market_research": "Mercado Laboral",
+        "academic_research": "Oferta Académica",
+        "gap_analysis": "Análisis de Brecha",
+        "curriculum": "Plan de Estudios",
+        "activities": "Actividades",
+        "evaluator": "Sistema de Evaluación",
+    }
+
+    for stage, score in quality_scores.items():
+        pct = int(score * 100)
+        label = stage_names.get(stage, stage.replace("_", " ").title())
+        if pct >= 75:
+            status = "[bold green]✓ Bueno[/bold green]"
+            score_fmt = f"[green]{pct}%[/green]"
+        elif pct >= 50:
+            status = "[bold yellow]⚠ Aceptable[/bold yellow]"
+            score_fmt = f"[yellow]{pct}%[/yellow]"
+        else:
+            status = "[bold red]✗ Bajo[/bold red]"
+            score_fmt = f"[red]{pct}%[/red]"
+        table.add_row(label, score_fmt, status)
+
+    console.print()
+    console.print(table)
+
+
 def main() -> None:
     args = parse_args()
     setup_logging(args.verbose)
@@ -90,37 +140,15 @@ def main() -> None:
         transient=False,
     ) as progress:
 
-        task = progress.add_task("Ejecutando agentes...", total=None)
+        task = progress.add_task("🔎 Investigando mercado laboral...", total=None)
 
-        stages = [
-            "🔎 Investigando mercado laboral en Costa Rica...",
-            "🎓 Investigando oferta académica universitaria...",
-            "📊 Analizando brecha educativa...",
-            "📝 Diseñando plan de estudios...",
-            "📅 Creando actividades de aprendizaje...",
-            "✅ Diseñando sistema de evaluación...",
-            "📄 Generando reporte HTML...",
-        ]
-
-        current_stage = {"idx": 0}
-
-        def on_progress(description: str) -> None:
-            if current_stage["idx"] < len(stages):
-                progress.update(task, description=stages[current_stage["idx"]])
-                current_stage["idx"] += 1
+        # Create a progress adapter so the orchestrator can update the Rich progress bar
+        progress_adapter = _RichProgressAdapter(progress, task)
 
         from src.agents.orchestrator import Orchestrator
-        orchestrator = Orchestrator()
-
-        # Monkey-patch the progress callback
-        original_update = orchestrator._update_progress
-        def patched_update(desc: str) -> None:
-            on_progress(desc)
-            original_update(desc)
-        orchestrator._update_progress = patched_update
+        orchestrator = Orchestrator(progress=progress_adapter)
 
         try:
-            progress.update(task, description=stages[0])
             report_path = orchestrator.run(sector=args.sector)
             progress.update(task, description="[bold green]¡Completado![/bold green]")
         except Exception as e:
@@ -131,6 +159,9 @@ def main() -> None:
                 traceback.print_exc()
             sys.exit(1)
 
+    # Print quality scores summary
+    _print_quality_scores(orchestrator._quality_scores)
+
     console.print()
     console.print(Panel(
         f"[bold green]¡Reporte generado exitosamente![/bold green]\n\n"
@@ -140,6 +171,15 @@ def main() -> None:
         title="TCU – Completado",
     ))
     console.print()
+
+    # Offer to open the report in the browser
+    try:
+        answer = input("¿Abrir el reporte en el navegador? [s/N]: ").strip().lower()
+        if answer in ("s", "si", "sí", "y", "yes"):
+            webbrowser.open(Path(report_path).resolve().as_uri())
+            console.print("[dim]Abriendo reporte en el navegador...[/dim]")
+    except (EOFError, KeyboardInterrupt):
+        pass  # Non-interactive environment or user pressed Ctrl+C
 
 
 if __name__ == "__main__":

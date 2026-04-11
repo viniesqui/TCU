@@ -53,3 +53,16 @@ class StudyPlan(BaseModel):
     weekly_schedule: list[LearningActivity]
     evaluator: Evaluator
     bibliography: list[str] = Field(default_factory=list, description="List of references/resources")
+
+    @model_validator(mode="after")
+    def check_activity_objective_refs(self) -> "StudyPlan":
+        """Ensure all activity objective indices are valid references into learning_objectives."""
+        num_objectives = len(self.learning_objectives)
+        for act in self.weekly_schedule:
+            for idx in act.learning_objectives_addressed:
+                if idx < 0 or idx >= num_objectives:
+                    raise ValueError(
+                        f"Activity '{act.title}' (week {act.week}) references objective index {idx}, "
+                        f"but only {num_objectives} objectives exist (valid indices: 0–{num_objectives - 1})."
+                    )
+        return self

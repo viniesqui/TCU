@@ -22,11 +22,11 @@ class Settings(BaseSettings):
     # ── Quality gate thresholds ──────────────────────────────────────────
     # Stage 1 – Market Research
     quality_min_skills: int = 8          # minimum distinct skills in IndustryDemand
-    quality_min_job_postings: int = 2    # minimum job postings sampled as evidence
+    quality_min_job_postings: int = 5    # minimum job postings sampled as evidence (raised from 2 for statistical validity)
     quality_min_sources: int = 2         # minimum sources consulted
 
     # Stage 2 – Academic Research
-    quality_min_universities: int = 3    # minimum university programs found
+    quality_min_universities: int = 5    # minimum university programs found (raised from 3 for CR coverage)
     quality_min_courses_per_program: int = 3  # minimum courses per curriculum entry
     quality_min_skills_covered: int = 10 # minimum skills in all_skills_covered
 

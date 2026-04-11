@@ -31,7 +31,7 @@ class MarketResearchGate(QualityGate):
 
     # Class-level defaults; overridden by settings at runtime
     MIN_SKILLS: int = 8
-    MIN_POSTINGS: int = 2
+    MIN_POSTINGS: int = 5
     MIN_SOURCES: int = 2
 
     @property
@@ -139,7 +139,7 @@ class AcademicResearchGate(QualityGate):
     - Summary is substantive
     """
 
-    MIN_UNIVERSITIES: int = 3
+    MIN_UNIVERSITIES: int = 5
     MIN_COURSES_PER_PROGRAM: int = 3
     MIN_SKILLS_COVERED: int = 10
 
