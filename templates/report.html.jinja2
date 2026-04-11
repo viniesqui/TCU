@@ -108,6 +108,16 @@
     /* Summary narrative */
     .narrative { background: var(--bg); border-left: 4px solid var(--accent); padding: 1rem 1.2rem; border-radius: 0 4px 4px 0; font-style: italic; color: var(--text); margin-top: 1rem; }
 
+    /* Quality scores */
+    .quality-grid { display: flex; flex-wrap: wrap; gap: 0.6rem; margin-top: 0.8rem; }
+    .quality-item { display: flex; align-items: center; gap: 0.5rem; background: var(--bg); border-radius: 4px; padding: 0.4rem 0.8rem; }
+    .quality-dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
+    .q-good { background: var(--covered); }
+    .q-warn { background: var(--moderate); }
+    .q-poor { background: var(--critical); }
+    .quality-label { font-size: 0.8rem; color: var(--muted); }
+    .quality-score { font-size: 0.85rem; font-weight: 600; color: var(--text); }
+
     /* Footer */
     .footer { text-align: center; padding: 2rem; color: var(--muted); font-size: 0.82rem; border-top: 1px solid var(--border); margin-top: 2rem; }
   </style>
@@ -163,6 +173,22 @@
       </div>
     </div>
     <div class="narrative">{{ gap_analysis.opportunity_statement }}</div>
+
+    {% if quality_scores %}
+    <div style="margin-top: 1.2rem;">
+      <strong style="font-size: 0.85rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.05em;">Calidad de investigación (gates automáticos)</strong>
+      <div class="quality-grid">
+        {% for stage, score in quality_scores.items() %}
+        {% set pct = (score * 100) | int %}
+        <div class="quality-item">
+          <div class="quality-dot {% if pct >= 75 %}q-good{% elif pct >= 50 %}q-warn{% else %}q-poor{% endif %}"></div>
+          <span class="quality-label">{{ stage | replace('_', ' ') | title }}:</span>
+          <span class="quality-score">{{ pct }}%</span>
+        </div>
+        {% endfor %}
+      </div>
+    </div>
+    {% endif %}
   </div>
 
   <!-- ===== LABOR MARKET ===== -->

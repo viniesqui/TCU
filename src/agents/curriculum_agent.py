@@ -16,11 +16,12 @@ class CurriculumAgent(BaseAgent):
             tools=[],  # No tools — pure reasoning
         )
 
-    def design(self, gap_analysis_json: str) -> str:
+    def design(self, gap_analysis_json: str, retry_context: str | None = None) -> str:
         """
         Design the course curriculum based on gap analysis.
         Args:
             gap_analysis_json: serialized GapAnalysis model
+            retry_context: Quality gate feedback from a previous attempt.
         Returns raw JSON string matching partial StudyPlan schema.
         """
         user_message = (
@@ -29,4 +30,6 @@ class CurriculumAgent(BaseAgent):
             f"define los metadatos del curso y selecciona la bibliografía adecuada.\n\n"
             f"=== ANÁLISIS DE BRECHA ===\n{gap_analysis_json}"
         )
+        if retry_context:
+            user_message += f"\n\n{retry_context}"
         return self.run(user_message)

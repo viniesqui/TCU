@@ -17,9 +17,12 @@ class LaborMarketAgent(BaseAgent):
             tools=RESEARCH_TOOLS,
         )
 
-    def research(self, sector: str) -> str:
+    def research(self, sector: str, retry_context: str | None = None) -> str:
         """
         Research labor market demand for the given sector in Costa Rica.
+        Args:
+            sector: Industry sector to research.
+            retry_context: Quality gate feedback from a previous attempt (Spanish instructions).
         Returns raw JSON string matching IndustryDemand schema.
         """
         user_message = (
@@ -28,4 +31,6 @@ class LaborMarketAgent(BaseAgent):
             f"y consulta reportes de la industria. "
             f"Usa múltiples búsquedas web y visita páginas de resultados para obtener datos reales."
         )
+        if retry_context:
+            user_message += f"\n\n{retry_context}"
         return self.run(user_message)

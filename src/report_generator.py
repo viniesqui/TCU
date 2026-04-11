@@ -25,6 +25,7 @@ class ReportGenerator:
         academic_landscape: AcademicLandscape,
         gap_analysis: GapAnalysis,
         study_plan: StudyPlan,
+        quality_scores: dict[str, float] | None = None,
     ) -> Path:
         """
         Render all pipeline outputs into an HTML report.
@@ -41,6 +42,7 @@ class ReportGenerator:
             academic_landscape=academic_landscape,
             gap_analysis=gap_analysis,
             study_plan=study_plan,
+            quality_scores=quality_scores or {},
             generated_date=datetime.now().strftime("%d de %B de %Y, %H:%M"),
         )
 

@@ -16,11 +16,12 @@ class ActivitiesAgent(BaseAgent):
             tools=[],  # No tools — pure reasoning
         )
 
-    def design(self, partial_plan_json: str) -> str:
+    def design(self, partial_plan_json: str, retry_context: str | None = None) -> str:
         """
         Design weekly learning activities for the course.
         Args:
             partial_plan_json: serialized partial StudyPlan (without weekly_schedule)
+            retry_context: Quality gate feedback from a previous attempt.
         Returns raw JSON string with {"weekly_schedule": [...]} matching LearningActivity list.
         """
         user_message = (
@@ -29,4 +30,6 @@ class ActivitiesAgent(BaseAgent):
             f"asegurando progresión pedagógica y alineación con los objetivos de aprendizaje.\n\n"
             f"=== PLAN DE ESTUDIOS ===\n{partial_plan_json}"
         )
+        if retry_context:
+            user_message += f"\n\n{retry_context}"
         return self.run(user_message)
