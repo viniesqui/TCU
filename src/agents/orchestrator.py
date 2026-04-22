@@ -35,7 +35,7 @@ from src.agents.gap_analyst_agent import GapAnalystAgent
 from src.agents.labor_market_agent import LaborMarketAgent
 from src.config import settings
 from src.models.academic import AcademicLandscape
-from src.models.course_design import Evaluator, LearningActivity, StudyPlan
+from src.models.course_design import Evaluator, LearningActivity, LearningObjective, StudyPlan
 from src.models.gap import GapAnalysis
 from src.models.market import IndustryDemand
 from src.quality.downstream_gates import ActivitiesGate, CurriculumGate, EvaluatorGate, GapAnalysisGate
@@ -108,7 +108,19 @@ class Orchestrator:
         final_plan_dict = partial_plan.model_dump()
         final_plan_dict["weekly_schedule"] = [a.model_dump() for a in activities]
         final_plan_dict["evaluator"] = evaluator.model_dump()
-        study_plan = StudyPlan.model_validate(final_plan_dict)
+        try:
+            study_plan = StudyPlan.model_validate(final_plan_dict)
+        except ValidationError as e:
+            # Activities may reference objective indices that are out of range due to
+            # the untyped list[dict] in _PartialStudyPlan. Strip invalid refs and retry.
+            logger.warning(f"[Orchestrator] Final plan cross-validation failed: {e}. Sanitizing activity refs.")
+            num_obj = len(final_plan_dict["learning_objectives"])
+            for act in final_plan_dict["weekly_schedule"]:
+                act["learning_objectives_addressed"] = [
+                    i for i in act.get("learning_objectives_addressed", [])
+                    if isinstance(i, int) and 0 <= i < num_obj
+                ]
+            study_plan = StudyPlan.model_validate(final_plan_dict)
 
         # Stage 7 – Report
         self._progress("📄 Generando reporte HTML...")
@@ -138,7 +150,7 @@ class Orchestrator:
             try:
                 raw = agent.research(sector, retry_context=retry_context)
                 result = IndustryDemand.model_validate_json(BaseAgent.clean_json(raw))
-            except (ValidationError, ValueError, Exception) as e:
+            except (ValidationError, ValueError, json.JSONDecodeError) as e:
                 logger.warning(f"[Stage 1] Parse/validation error: {e}")
                 retry_context = (
                     f"Tu respuesta anterior no fue JSON válido. Error: {e}. "
@@ -178,7 +190,7 @@ class Orchestrator:
             try:
                 raw = agent.research(sector, retry_context=retry_context, broaden_to_region=broaden)
                 result = AcademicLandscape.model_validate_json(BaseAgent.clean_json(raw))
-            except (ValidationError, ValueError, Exception) as e:
+            except (ValidationError, ValueError, json.JSONDecodeError) as e:
                 logger.warning(f"[Stage 2] Parse/validation error: {e}")
                 retry_context = (
                     f"Tu respuesta anterior no fue JSON válido. Error: {e}. "
@@ -199,12 +211,20 @@ class Orchestrator:
                 logger.warning(f"[Stage 2] Quality gate failed after all retries. Proceeding with best result.")
                 return result
 
-            # On first failure: try geographic broadening if suggested
+            # On first failure: try geographic broadening if suggested.
+            # Use broadening-specific instructions instead of the gate's CR-focused ones
+            # to avoid sending contradictory guidance (search CA + focus on UCR/TEC).
             if gate_result.suggest_broadening and not broaden:
                 logger.info("[Stage 2] Broadening search scope to Central America")
                 broaden = True
-
-            retry_context = gate_result.retry_instructions
+                retry_context = (
+                    "La búsqueda en Costa Rica no encontró suficientes programas. "
+                    "Amplía la búsqueda a toda Centroamérica: incluye USAC (Guatemala), "
+                    "UES (El Salvador), UNAH (Honduras), UNAN (Nicaragua), UP (Panamá) "
+                    "además de las universidades costarricenses ya encontradas."
+                )
+            else:
+                retry_context = gate_result.retry_instructions
 
         return result
 
@@ -226,7 +246,7 @@ class Orchestrator:
             try:
                 raw = agent.analyze(demand_json, academic_json, retry_context=retry_context)
                 result = GapAnalysis.model_validate_json(BaseAgent.clean_json(raw))
-            except (ValidationError, ValueError, Exception) as e:
+            except (ValidationError, ValueError, json.JSONDecodeError) as e:
                 logger.warning(f"[Stage 3] Parse/validation error: {e}")
                 retry_context = f"JSON inválido. Error: {e}. Responde solo con JSON."
                 if attempt > self.max_retries:
@@ -262,7 +282,7 @@ class Orchestrator:
             try:
                 raw = agent.design(gap_json, retry_context=retry_context)
                 result = _PartialStudyPlan.model_validate_json(BaseAgent.clean_json(raw))
-            except (ValidationError, ValueError, Exception) as e:
+            except (ValidationError, ValueError, json.JSONDecodeError) as e:
                 logger.warning(f"[Stage 4] Parse/validation error: {e}")
                 retry_context = f"JSON inválido. Error: {e}. Responde solo con JSON."
                 if attempt > self.max_retries:
@@ -300,7 +320,7 @@ class Orchestrator:
                 raw = agent.design(plan_json, retry_context=retry_context)
                 wrapper = _ActivitiesWrapper.model_validate_json(BaseAgent.clean_json(raw))
                 activities = wrapper.weekly_schedule
-            except (ValidationError, ValueError, Exception) as e:
+            except (ValidationError, ValueError, json.JSONDecodeError) as e:
                 logger.warning(f"[Stage 5] Parse/validation error: {e}")
                 retry_context = f"JSON inválido. Error: {e}. Responde solo con JSON."
                 if attempt > self.max_retries:
@@ -412,7 +432,7 @@ class _PartialStudyPlan(BaseModel):
     total_weeks: int
     target_audience: str
     prerequisites: list[str] = []
-    learning_objectives: list[dict] = []
+    learning_objectives: list[LearningObjective] = []
     bibliography: list[str] = []
 
 

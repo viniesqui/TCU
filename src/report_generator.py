@@ -111,12 +111,22 @@ class ReportGenerator:
         )
 
         output_dir = Path(settings.output_dir)
-        output_dir.mkdir(exist_ok=True)
+        output_dir.mkdir(parents=True, exist_ok=True)
 
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        sector_slug = gap_analysis.sector.lower().replace(" ", "_")[:30]
+        # Sanitize sector name: keep only alphanumeric, spaces, hyphens; replace spaces with underscores
+        import re as _re
+        safe_sector = _re.sub(r"[^\w\s-]", "", gap_analysis.sector)
+        sector_slug = safe_sector.lower().replace(" ", "_")[:30]
         output_path = output_dir / f"reporte_{sector_slug}_{timestamp}.html"
 
-        output_path.write_text(html, encoding="utf-8")
+        try:
+            output_path.write_text(html, encoding="utf-8")
+        except OSError as e:
+            raise RuntimeError(
+                f"[ReportGenerator] Failed to write report to '{output_path}': {e}. "
+                f"Check disk space and directory permissions."
+            ) from e
+
         logger.info(f"[ReportGenerator] Report written to: {output_path}")
         return output_path
