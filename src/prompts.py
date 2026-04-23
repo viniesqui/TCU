@@ -24,8 +24,22 @@ _INDUSTRY_DEMAND_SCHEMA = """
       "title": "string",
       "company": "string o null",
       "source_url": "https://...",
-      "required_skills": ["skill1", "skill2"],
-      "preferred_skills": ["skill3"],
+      "required_skills": [
+        {
+          "name": "Python",
+          "category": "technical",
+          "frequency_score": 0.9,
+          "example_sources": ["https://ejemplo.com/oferta1"]
+        }
+      ],
+      "preferred_skills": [
+        {
+          "name": "Docker",
+          "category": "tool",
+          "frequency_score": 0.6,
+          "example_sources": []
+        }
+      ],
       "seniority": "junior|mid|senior|lead|any",
       "location": "San José, Costa Rica"
     }

@@ -42,6 +42,7 @@ class TestWebSearch:
 
         data = json.loads(result)
         assert "error" in data
+        assert "error_code" in data  # required for base_agent to set is_error=True
         assert "query" in data
 
     def test_retries_on_transient_failure_then_succeeds(self):

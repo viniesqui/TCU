@@ -6,7 +6,7 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 class Settings(BaseSettings):
     # Core AI
     anthropic_api_key: str
-    model: str = "claude-sonnet-4-5"
+    model: str = "claude-sonnet-4-6"
 
     # Agent loop limits
     max_agent_iterations: int = 12
@@ -44,9 +44,11 @@ def get_settings() -> Settings:
 
 
 class _SettingsProxy:
-    """Proxy that forwards attribute access to the lazily-loaded Settings."""
+    """Proxy that forwards attribute access to the lazily-loaded Settings singleton."""
     def __getattr__(self, name: str):
         return getattr(get_settings(), name)
 
 
-settings = _SettingsProxy()
+# Typed as Settings so IDEs and type-checkers see the actual attribute names.
+# At runtime this is a _SettingsProxy (lazy-loaded on first access, safe for import order).
+settings: Settings = _SettingsProxy()  # type: ignore[assignment]

@@ -58,4 +58,4 @@ def web_search(query: str, max_results: int = 5) -> str:
                 time.sleep(2)
             else:
                 logger.warning(f"[web_search] all {max_retries + 1} attempts failed: {e}")
-                return json.dumps({"error": str(e), "query": query})
+                return json.dumps({"error": str(e), "error_code": "search_failed", "query": query})

@@ -46,6 +46,7 @@ class GapAnalysisGate(QualityGate):
         score_components.append(min(actionable / 5, 1.0))
 
         # --- Check: critical gaps are truly critical ---
+        critical_gap_issue = False
         if data.critical_gaps:
             bad_critical = [
                 g for g in data.critical_gaps
@@ -57,7 +58,8 @@ class GapAnalysisGate(QualityGate):
                     f"Algunas brechas marcadas como 'críticas' no tienen scores consistentes "
                     f"({names}). Una brecha crítica debe tener demanda >= 0.6 y cobertura <= 0.2."
                 )
-        score_components.append(1.0 if not data.critical_gaps or not issues else 0.5)
+                critical_gap_issue = True
+        score_components.append(1.0 if not critical_gap_issue else 0.5)
 
         # --- Check: proposed course title ---
         title = (data.proposed_course_title or "").strip()
