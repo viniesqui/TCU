@@ -1,6 +1,9 @@
+import datetime
 import json
 import logging
 import re
+import uuid
+from pathlib import Path
 from typing import Any
 
 import anthropic
@@ -13,6 +16,9 @@ logger = logging.getLogger(__name__)
 
 # Trim context when the raw character count exceeds this threshold (~45k tokens).
 _MAX_CONTEXT_CHARS = 180_000
+
+# Structured trace log – one JSON object per line (JSON Lines format).
+_TRACE_LOG_PATH = Path("traces") / "llm_calls.jsonl"
 
 
 def _escape_newlines_in_strings(text: str) -> str:
@@ -147,7 +153,27 @@ class BaseAgent:
         }
         if self.tools:
             kwargs["tools"] = self.tools
-        return self._client.messages.create(**kwargs)
+        response = self._client.messages.create(**kwargs)
+        self._log_llm_trace(response)
+        return response
+
+    def _log_llm_trace(self, response: anthropic.types.Message) -> None:
+        """Append a structured trace record for each completed LLM call."""
+        entry = {
+            "trace_id": str(uuid.uuid4()),
+            "agent": self.name,
+            "timestamp": datetime.datetime.utcnow().isoformat() + "Z",
+            "model": self.model,
+            "prompt_tokens": response.usage.input_tokens,
+            "completion_tokens": response.usage.output_tokens,
+            "total_tokens": response.usage.input_tokens + response.usage.output_tokens,
+        }
+        try:
+            _TRACE_LOG_PATH.parent.mkdir(exist_ok=True)
+            with _TRACE_LOG_PATH.open("a", encoding="utf-8") as fh:
+                fh.write(json.dumps(entry) + "\n")
+        except Exception as exc:
+            logger.warning(f"[{self.name}] Failed to write trace log: {exc}")
 
     def _execute_tool_calls(self, response: anthropic.types.Message) -> list[dict]:
         """Execute all tool_use blocks from the response, return tool_result blocks."""

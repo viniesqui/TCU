@@ -18,6 +18,15 @@ env/
 # Output (generated reports)
 output/
 
+# Stage checkpoint cache (dev artifact)
+stage_cache/
+
+# Search result cache (dev artifact)
+search_cache/
+
+# Structured LLM call traces
+traces/
+
 # Logs
 logs/
 *.log
