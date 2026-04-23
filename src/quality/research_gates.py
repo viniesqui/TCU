@@ -10,6 +10,8 @@ AcademicResearchGate – validates AcademicLandscape from AcademicAgent
 
 from __future__ import annotations
 
+import re
+
 from src.config import settings
 from src.models.academic import AcademicLandscape
 from src.models.market import IndustryDemand
@@ -103,6 +105,36 @@ class MarketResearchGate(QualityGate):
                 )
             score_components.append(min(top_score / 0.7, 1.0))
 
+        # --- Check: hallucination detection (top skills must appear in posting evidence) ---
+        if data.job_postings_sampled:
+            evidence: set[str] = set()
+            for posting in data.job_postings_sampled:
+                for skill in posting.required_skills + posting.preferred_skills:
+                    evidence.add(re.sub(r'[^a-z0-9]', '', skill.name.lower()))
+
+            hallucinated: list[str] = []
+            for skill in data.top_skills:
+                if skill.category == "soft":
+                    continue
+                if skill.frequency_score < 0.5:
+                    continue
+                norm = re.sub(r'[^a-z0-9]', '', skill.name.lower())
+                grounded = (
+                    any(norm in ev for ev in evidence)
+                    or any(len(ev) >= 3 and ev in norm for ev in evidence)
+                )
+                if not grounded:
+                    hallucinated.append(skill.name)
+
+            if hallucinated:
+                names = ", ".join(hallucinated)
+                issues.append(
+                    f"Las siguientes habilidades no aparecen en ninguna oferta muestreada "
+                    f"y podrían ser alucinadas: {names}. "
+                    f"Verifica que cada habilidad técnica esté respaldada por al menos una oferta real."
+                )
+            score_components.append(0.0 if hallucinated else 1.0)
+
         # --- Determine if broadening is needed ---
         suggest_broadening = skill_count < max(3, min_skills // 2) or posting_count == 0
 
@@ -123,6 +155,7 @@ class MarketResearchGate(QualityGate):
             "- Consulta explícitamente: LinkedIn Costa Rica, Computrabajo Costa Rica, CAMTIC, CINDE.",
             "- Asegúrate de que cada habilidad técnica aparezca en múltiples fuentes antes de incluirla.",
             "- Asigna frequency_score basándote en cuántas veces aparece la habilidad (no estimes).",
+            "- Incluye SOLO habilidades que hayas visto en al menos una oferta de trabajo real visitada.",
         ]
         return "\n".join(lines)
 
