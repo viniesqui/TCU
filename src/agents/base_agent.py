@@ -15,6 +15,30 @@ logger = logging.getLogger(__name__)
 _MAX_CONTEXT_CHARS = 180_000
 
 
+def _escape_newlines_in_strings(text: str) -> str:
+    """Replace literal newline/carriage-return characters inside JSON string values."""
+    result: list[str] = []
+    in_string = False
+    escaped = False
+    for ch in text:
+        if escaped:
+            result.append(ch)
+            escaped = False
+        elif ch == "\\" and in_string:
+            result.append(ch)
+            escaped = True
+        elif ch == '"':
+            result.append(ch)
+            in_string = not in_string
+        elif ch == "\n" and in_string:
+            result.append("\\n")
+        elif ch == "\r" and in_string:
+            result.append("\\r")
+        else:
+            result.append(ch)
+    return "".join(result)
+
+
 def _is_retriable_api_error(exc: BaseException) -> bool:
     """Only retry on rate limits and transient server errors — never on 4xx client errors."""
     if isinstance(exc, anthropic.RateLimitError):
@@ -175,6 +199,7 @@ class BaseAgent:
 
         Strategy 1: locate the outermost { } or [ ] block and validate it parses.
         Strategy 2: strip all markdown code fences (multiline-aware) and return remainder.
+        Strategy 3: lightweight repair for trailing commas and unescaped newlines, then retry.
         """
         text = raw.strip()
 
@@ -193,7 +218,54 @@ class BaseAgent:
         # Strategy 2: strip markdown fences anywhere in the string
         cleaned = re.sub(r"```(?:json)?\s*", "", text, flags=re.IGNORECASE)
         cleaned = re.sub(r"```", "", cleaned)
-        return cleaned.strip()
+        cleaned = cleaned.strip()
+
+        # Strategy 3: repair trailing commas and unescaped newlines, then retry
+        repaired = re.sub(r",\s*([}\]])", r"\1", cleaned)
+        repaired = _escape_newlines_in_strings(repaired)
+        try:
+            json.loads(repaired)
+            return repaired
+        except json.JSONDecodeError:
+            pass
+
+        return cleaned
+
+    def repair_json(self, raw: str) -> str:
+        """
+        Full JSON repair pipeline.
+
+        1. Run clean_json (prose extraction + lightweight regex repair).
+        2. If the result still does not parse, fall back to a targeted LLM repair call.
+
+        Returns a string that json.loads() accepts, or raises ValueError.
+        """
+        cleaned = self.clean_json(raw)
+        try:
+            json.loads(cleaned)
+            return cleaned
+        except json.JSONDecodeError:
+            pass
+
+        logger.warning(f"[{self.name}] clean_json produced invalid JSON; attempting LLM repair")
+        return self._llm_repair_json(raw)
+
+    def _llm_repair_json(self, broken: str) -> str:
+        """Single targeted LLM call that returns only the corrected JSON."""
+        response = self._client.messages.create(
+            model=self.model,
+            max_tokens=4096,
+            system="You are a JSON repair tool. Output only valid JSON — no explanation, no markdown fences.",
+            messages=[{"role": "user", "content": f"Fix this malformed JSON:\n\n{broken}"}],
+        )
+        fixed = self._extract_text(response)
+        fixed = re.sub(r"```(?:json)?\s*|\s*```", "", fixed, flags=re.IGNORECASE).strip()
+        try:
+            json.loads(fixed)
+        except json.JSONDecodeError as exc:
+            raise ValueError(f"[{self.name}] LLM JSON repair produced invalid JSON: {exc}") from exc
+        logger.info(f"[{self.name}] LLM JSON repair succeeded")
+        return fixed
 
     def _maybe_trim_messages(self, messages: list[dict]) -> list[dict]:
         """

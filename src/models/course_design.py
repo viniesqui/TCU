@@ -36,9 +36,15 @@ class Evaluator(BaseModel):
     @model_validator(mode="after")
     def check_weights_sum(self) -> "Evaluator":
         total = sum(c.weight_percent for c in self.evaluation_components)
-        if abs(total - 100.0) > 1.0:
-            raise ValueError(f"Evaluation weights must sum to 100, got {total:.1f}")
-        return self
+        if total == 100.0:
+            return self
+        delta = 100.0 - total
+        if abs(delta) <= 2.0:
+            # Within the fuzzy tolerance [98.0, 102.0]: pin the largest component so sum == 100.0
+            largest = max(self.evaluation_components, key=lambda c: c.weight_percent)
+            largest.weight_percent += delta
+            return self
+        raise ValueError(f"Evaluation weights must sum to 100, got {total:.1f}")
 
 
 class StudyPlan(BaseModel):
