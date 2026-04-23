@@ -1,7 +1,7 @@
 """
-TCU Orchestrator – V2 with Quality Gates
-=========================================
-Python state machine that sequences the six specialist agents.
+TCU Orchestrator – simplified pipeline with quality gates
+=========================================================
+Python state machine that sequences the specialist agents.
 Between every stage, a quality gate validates the output and — if the result
 is insufficient — re-runs the agent with targeted Spanish-language instructions
 explaining exactly what to improve.
@@ -10,10 +10,9 @@ Pipeline:
     Stage 1: LaborMarketAgent    → IndustryDemand      → MarketResearchGate
     Stage 2: AcademicAgent       → AcademicLandscape   → AcademicResearchGate
     Stage 3: GapAnalystAgent     → GapAnalysis         → GapAnalysisGate
-    Stage 4: CurriculumAgent     → partial StudyPlan   → CurriculumGate
-    Stage 5: ActivitiesAgent     → weekly_schedule     → ActivitiesGate
-    Stage 6: EvaluatorAgent      → Evaluator           → (Pydantic weight-sum already enforces)
-    Stage 7: ReportGenerator     → HTML file
+    Stage 4: CourseDesignerAgent → StudyPlan (partial) → CurriculumGate + ActivitiesGate
+    Stage 5: EvaluatorAgent      → Evaluator           → EvaluatorGate
+    Stage 6: ReportGenerator     → HTML file
 """
 
 from __future__ import annotations
@@ -21,21 +20,19 @@ from __future__ import annotations
 import json
 import logging
 from dataclasses import dataclass, field
-from pathlib import Path
 from typing import Any
 
-from pydantic import BaseModel, ValidationError
+from pydantic import ValidationError
 
 from src.agents.academic_agent import AcademicAgent
-from src.agents.activities_agent import ActivitiesAgent
 from src.agents.base_agent import BaseAgent
-from src.agents.curriculum_agent import CurriculumAgent
+from src.agents.course_designer_agent import CourseDesignerAgent
 from src.agents.evaluator_agent import EvaluatorAgent
 from src.agents.gap_analyst_agent import GapAnalystAgent
 from src.agents.labor_market_agent import LaborMarketAgent
 from src.config import settings
 from src.models.academic import AcademicLandscape
-from src.models.course_design import Evaluator, LearningActivity, LearningObjective, StudyPlan
+from src.models.course_design import Evaluator, StudyPlan
 from src.models.gap import GapAnalysis
 from src.models.market import IndustryDemand
 from src.quality.downstream_gates import ActivitiesGate, CurriculumGate, EvaluatorGate, GapAnalysisGate
@@ -78,7 +75,7 @@ class Orchestrator:
 
     def run(self, sector: str = "Desarrollo de Software") -> str:
         """Execute the full pipeline. Returns path to generated HTML report."""
-        logger.info(f"[Orchestrator] ── V2 Pipeline start ── sector='{sector}'")
+        logger.info(f"[Orchestrator] ── Pipeline start ── sector='{sector}'")
 
         # Stage 1 – Labor Market Research
         self._progress("🔎 Investigando mercado laboral en Costa Rica...")
@@ -92,37 +89,16 @@ class Orchestrator:
         self._progress("📊 Analizando brecha educativa...")
         gap_analysis = self._stage_gap_analysis(industry_demand, academic_landscape)
 
-        # Stage 4 – Curriculum Design
-        self._progress("📝 Diseñando plan de estudios...")
-        partial_plan = self._stage_curriculum(gap_analysis)
+        # Stage 4 – Course Design (curriculum + activities in one call)
+        self._progress("📝 Diseñando plan de estudios y cronograma de actividades...")
+        study_plan = self._stage_course_design(gap_analysis)
 
-        # Stage 5 – Learning Activities
-        self._progress("📅 Creando actividades de aprendizaje...")
-        activities = self._stage_activities(partial_plan)
-
-        # Stage 6 – Evaluator
+        # Stage 5 – Evaluator
         self._progress("✅ Diseñando sistema de evaluación...")
-        evaluator = self._stage_evaluator(partial_plan, activities)
+        evaluator = self._stage_evaluator(study_plan)
+        study_plan.evaluator = evaluator
 
-        # Assemble final StudyPlan
-        final_plan_dict = partial_plan.model_dump()
-        final_plan_dict["weekly_schedule"] = [a.model_dump() for a in activities]
-        final_plan_dict["evaluator"] = evaluator.model_dump()
-        try:
-            study_plan = StudyPlan.model_validate(final_plan_dict)
-        except ValidationError as e:
-            # Activities may reference objective indices that are out of range due to
-            # the untyped list[dict] in _PartialStudyPlan. Strip invalid refs and retry.
-            logger.warning(f"[Orchestrator] Final plan cross-validation failed: {e}. Sanitizing activity refs.")
-            num_obj = len(final_plan_dict["learning_objectives"])
-            for act in final_plan_dict["weekly_schedule"]:
-                act["learning_objectives_addressed"] = [
-                    i for i in act.get("learning_objectives_addressed", [])
-                    if isinstance(i, int) and 0 <= i < num_obj
-                ]
-            study_plan = StudyPlan.model_validate(final_plan_dict)
-
-        # Stage 7 – Report
+        # Stage 6 – Report
         self._progress("📄 Generando reporte HTML...")
         from src.report_generator import ReportGenerator
         report_path = ReportGenerator().render(
@@ -268,12 +244,13 @@ class Orchestrator:
         return result
 
     # ------------------------------------------------------------------
-    # Stage 4: Curriculum Design
+    # Stage 4: Course Design (curriculum + activities)
     # ------------------------------------------------------------------
 
-    def _stage_curriculum(self, gap_analysis: GapAnalysis) -> _PartialStudyPlan:
-        gate = CurriculumGate()
-        agent = CurriculumAgent()
+    def _stage_course_design(self, gap_analysis: GapAnalysis) -> StudyPlan:
+        curriculum_gate = CurriculumGate()
+        activities_gate = ActivitiesGate()
+        agent = CourseDesignerAgent()
         gap_json = gap_analysis.model_dump_json(indent=2)
         retry_context: str | None = None
 
@@ -281,107 +258,70 @@ class Orchestrator:
             logger.info(f"[Stage 4] Attempt {attempt}/{self.max_retries + 1}")
             try:
                 raw = agent.design(gap_json, retry_context=retry_context)
-                result = _PartialStudyPlan.model_validate_json(BaseAgent.clean_json(raw))
+                result = StudyPlan.model_validate_json(BaseAgent.clean_json(raw))
             except (ValidationError, ValueError, json.JSONDecodeError) as e:
                 logger.warning(f"[Stage 4] Parse/validation error: {e}")
-                retry_context = f"JSON inválido. Error: {e}. Responde solo con JSON."
+                retry_context = f"JSON inválido o índices de objetivos fuera de rango. Error: {e}. Responde solo con JSON."
                 if attempt > self.max_retries:
                     raise RuntimeError(f"Stage 4 failed after {attempt} attempts") from e
                 continue
 
-            gate_result = gate.evaluate(result.model_dump())
-            self._quality_scores["curriculum"] = gate_result.score
-            self._log_gate(gate_result)
+            curriculum_result = curriculum_gate.evaluate(result)
+            activities_result = activities_gate.evaluate(
+                activities=result.weekly_schedule or [],
+                total_weeks=result.total_weeks,
+                num_objectives=len(result.learning_objectives),
+            )
+            self._quality_scores["curriculum"] = curriculum_result.score
+            self._quality_scores["activities"] = activities_result.score
+            self._log_gate(curriculum_result)
+            self._log_gate(activities_result)
 
-            if gate_result.passed:
+            if curriculum_result.passed and activities_result.passed:
                 return result
             if attempt > self.max_retries:
-                logger.warning("[Stage 4] Proceeding with best result after gate failures.")
+                logger.warning("[Stage 4] Quality gate(s) failed after all retries. Proceeding with best result.")
                 return result
 
-            retry_context = gate_result.retry_instructions
+            parts = [
+                curriculum_result.retry_instructions if not curriculum_result.passed else "",
+                activities_result.retry_instructions if not activities_result.passed else "",
+            ]
+            retry_context = "\n\n".join(p for p in parts if p)
 
-        return result
+        return result  # unreachable but satisfies type checker
 
     # ------------------------------------------------------------------
-    # Stage 5: Learning Activities
+    # Stage 5: Evaluator
     # ------------------------------------------------------------------
 
-    def _stage_activities(self, partial_plan: _PartialStudyPlan) -> list[LearningActivity]:
-        gate = ActivitiesGate()
-        agent = ActivitiesAgent()
-        plan_json = partial_plan.model_dump_json(indent=2)
-        num_objectives = len(partial_plan.learning_objectives)
+    def _stage_evaluator(self, study_plan: StudyPlan) -> Evaluator:
+        gate = EvaluatorGate()
+        agent = EvaluatorAgent()
+        full_json = study_plan.model_dump_json(indent=2, exclude={"evaluator"})
         retry_context: str | None = None
 
         for attempt in range(1, self.max_retries + 2):
             logger.info(f"[Stage 5] Attempt {attempt}/{self.max_retries + 1}")
             try:
-                raw = agent.design(plan_json, retry_context=retry_context)
-                wrapper = _ActivitiesWrapper.model_validate_json(BaseAgent.clean_json(raw))
-                activities = wrapper.weekly_schedule
-            except (ValidationError, ValueError, json.JSONDecodeError) as e:
-                logger.warning(f"[Stage 5] Parse/validation error: {e}")
-                retry_context = f"JSON inválido. Error: {e}. Responde solo con JSON."
-                if attempt > self.max_retries:
-                    raise RuntimeError(f"Stage 5 failed after {attempt} attempts") from e
-                continue
-
-            gate_result = gate.evaluate(
-                activities=activities,
-                total_weeks=partial_plan.total_weeks,
-                num_objectives=num_objectives,
-            )
-            self._quality_scores["activities"] = gate_result.score
-            self._log_gate(gate_result)
-
-            if gate_result.passed:
-                return activities
-            if attempt > self.max_retries:
-                logger.warning("[Stage 5] Proceeding with best result after gate failures.")
-                return activities
-
-            retry_context = gate_result.retry_instructions
-
-        return activities
-
-    # ------------------------------------------------------------------
-    # Stage 6: Evaluator
-    # ------------------------------------------------------------------
-
-    def _stage_evaluator(
-        self, partial_plan: _PartialStudyPlan, activities: list[LearningActivity]
-    ) -> Evaluator:
-        gate = EvaluatorGate()
-        agent = EvaluatorAgent()
-        # Build full context including activities for the evaluator
-        full_dict = partial_plan.model_dump()
-        full_dict["weekly_schedule"] = [a.model_dump() for a in activities]
-        full_json = json.dumps(full_dict, ensure_ascii=False, indent=2)
-        retry_context: str | None = None
-
-        for attempt in range(1, self.max_retries + 2):
-            logger.info(f"[Stage 6] Attempt {attempt}/{self.max_retries + 1}")
-            try:
                 raw = agent.design(full_json, retry_context=retry_context)
                 result = Evaluator.model_validate_json(BaseAgent.clean_json(raw))
             except ValidationError as e:
-                logger.warning(f"[Stage 6] Validation error (weights?): {e}")
+                logger.warning(f"[Stage 5] Validation error (weights?): {e}")
                 retry_context = (
                     f"Error de validación Pydantic: {e}. "
                     f"CRÍTICO: los weight_percent de todos los componentes DEBEN sumar exactamente 100."
                 )
                 if attempt > self.max_retries:
-                    raise RuntimeError(f"Stage 6 failed after {attempt} attempts") from e
+                    raise RuntimeError(f"Stage 5 failed after {attempt} attempts") from e
                 continue
             except Exception as e:
-                logger.warning(f"[Stage 6] Error: {e}")
+                logger.warning(f"[Stage 5] Error: {e}")
                 retry_context = f"Tu respuesta anterior no fue JSON válido. Error: {e}. Responde solo con JSON."
                 if attempt > self.max_retries:
-                    raise RuntimeError(f"Stage 6 failed after {attempt} attempts") from e
+                    raise RuntimeError(f"Stage 5 failed after {attempt} attempts") from e
                 continue
 
-            # Run quality gate on the content
             gate_result = gate.evaluate(result)
             self._quality_scores["evaluator"] = gate_result.score
             self._log_gate(gate_result)
@@ -390,12 +330,12 @@ class Orchestrator:
                 return result
 
             if attempt > self.max_retries:
-                logger.warning("[Stage 6] Quality gate failed after all retries. Proceeding with best result.")
+                logger.warning("[Stage 5] Quality gate failed after all retries. Proceeding with best result.")
                 return result
 
             retry_context = gate_result.retry_instructions
 
-        raise RuntimeError("Stage 6: unreachable")
+        raise RuntimeError("Stage 5: unreachable")
 
     # ------------------------------------------------------------------
     # Helpers
@@ -417,25 +357,3 @@ class Orchestrator:
             except Exception:
                 pass
         logger.info(f"[Orchestrator] {description}")
-
-
-# ---------------------------------------------------------------------------
-# Internal Pydantic helpers for partial pipeline data
-# ---------------------------------------------------------------------------
-
-class _PartialStudyPlan(BaseModel):
-    """Partial StudyPlan without weekly_schedule and evaluator (filled in later stages)."""
-    course_title: str
-    course_code: str
-    credits: int
-    hours_per_week: float
-    total_weeks: int
-    target_audience: str
-    prerequisites: list[str] = []
-    learning_objectives: list[LearningObjective] = []
-    bibliography: list[str] = []
-
-
-class _ActivitiesWrapper(BaseModel):
-    """Wrapper for activities agent output."""
-    weekly_schedule: list[LearningActivity]

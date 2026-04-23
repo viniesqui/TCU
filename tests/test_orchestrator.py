@@ -84,7 +84,12 @@ def _make_gap_analysis_json():
     })
 
 
-def _make_partial_plan_json():
+def _make_course_design_json():
+    """Combined course design output: learning objectives + weekly schedule (no evaluator)."""
+    activity_types = ["lectura", "laboratorio", "laboratorio", "taller",
+                      "laboratorio", "caso_estudio", "proyecto", "taller",
+                      "laboratorio", "proyecto", "debate", "proyecto",
+                      "proyecto", "proyecto", "taller", "evaluacion"]
     return json.dumps({
         "course_title": "Desarrollo Cloud-Native y DevOps Moderno",
         "course_code": "TCU-501",
@@ -103,26 +108,18 @@ def _make_partial_plan_json():
             {"bloom_level": "crear", "description": "Diseñar pipeline CI/CD completo."},
         ],
         "bibliography": ["Ref 1", "Ref 2", "Ref 3"],
+        "weekly_schedule": [
+            {
+                "week": i + 1,
+                "title": f"Actividad semana {i + 1}",
+                "activity_type": activity_types[i],
+                "description": f"Descripción detallada de la actividad de la semana {i + 1}.",
+                "estimated_hours": 3.0 if activity_types[i] == "lectura" else 5.0,
+                "learning_objectives_addressed": [i % 7, (i + 1) % 7],
+            }
+            for i in range(16)
+        ],
     })
-
-
-def _make_activities_json():
-    activity_types = ["lectura", "laboratorio", "laboratorio", "taller",
-                      "laboratorio", "caso_estudio", "proyecto", "taller",
-                      "laboratorio", "proyecto", "debate", "proyecto",
-                      "proyecto", "proyecto", "taller", "evaluacion"]
-    activities = [
-        {
-            "week": i + 1,
-            "title": f"Actividad semana {i + 1}",
-            "activity_type": activity_types[i],
-            "description": f"Descripción detallada de la actividad de la semana {i + 1}.",
-            "estimated_hours": 3.0 if activity_types[i] == "lectura" else 5.0,
-            "learning_objectives_addressed": [i % 7, (i + 1) % 7],
-        }
-        for i in range(16)
-    ]
-    return json.dumps({"weekly_schedule": activities})
 
 
 def _make_evaluator_json():
@@ -164,17 +161,16 @@ class TestOrchestratorIntegration:
     """
 
     def _patch_all_agents(self):
-        """Return a context manager patch dict for all 6 agents."""
+        """Return a dict of mock return values for all agents."""
         return {
             "LaborMarketAgent.research": _make_industry_demand_json(),
             "AcademicAgent.research": _make_academic_landscape_json(),
             "GapAnalystAgent.analyze": _make_gap_analysis_json(),
-            "CurriculumAgent.design": _make_partial_plan_json(),
-            "ActivitiesAgent.design": _make_activities_json(),
+            "CourseDesignerAgent.design": _make_course_design_json(),
             "EvaluatorAgent.design": _make_evaluator_json(),
         }
 
-    def _run_pipeline(self, patches_dict, overrides=None):
+    def _run_pipeline(self, patches_dict):
         """Helper: patch all agents and run the pipeline."""
         from src.agents.orchestrator import Orchestrator
 
@@ -182,8 +178,7 @@ class TestOrchestratorIntegration:
             patch("src.agents.labor_market_agent.LaborMarketAgent.research", return_value=patches_dict["LaborMarketAgent.research"]),
             patch("src.agents.academic_agent.AcademicAgent.research", return_value=patches_dict["AcademicAgent.research"]),
             patch("src.agents.gap_analyst_agent.GapAnalystAgent.analyze", return_value=patches_dict["GapAnalystAgent.analyze"]),
-            patch("src.agents.curriculum_agent.CurriculumAgent.design", return_value=patches_dict["CurriculumAgent.design"]),
-            patch("src.agents.activities_agent.ActivitiesAgent.design", return_value=patches_dict["ActivitiesAgent.design"]),
+            patch("src.agents.course_designer_agent.CourseDesignerAgent.design", return_value=patches_dict["CourseDesignerAgent.design"]),
             patch("src.agents.evaluator_agent.EvaluatorAgent.design", return_value=patches_dict["EvaluatorAgent.design"]),
         ):
             orchestrator = Orchestrator()
@@ -221,8 +216,7 @@ class TestOrchestratorIntegration:
             patch("src.agents.labor_market_agent.LaborMarketAgent.research", research_mock),
             patch("src.agents.academic_agent.AcademicAgent.research", return_value=patches["AcademicAgent.research"]),
             patch("src.agents.gap_analyst_agent.GapAnalystAgent.analyze", return_value=patches["GapAnalystAgent.analyze"]),
-            patch("src.agents.curriculum_agent.CurriculumAgent.design", return_value=patches["CurriculumAgent.design"]),
-            patch("src.agents.activities_agent.ActivitiesAgent.design", return_value=patches["ActivitiesAgent.design"]),
+            patch("src.agents.course_designer_agent.CourseDesignerAgent.design", return_value=patches["CourseDesignerAgent.design"]),
             patch("src.agents.evaluator_agent.EvaluatorAgent.design", return_value=patches["EvaluatorAgent.design"]),
         ):
             orchestrator = Orchestrator()
@@ -243,8 +237,7 @@ class TestOrchestratorIntegration:
             patch("src.agents.labor_market_agent.LaborMarketAgent.research", return_value=json.dumps(thin_demand)),
             patch("src.agents.academic_agent.AcademicAgent.research", return_value=patches["AcademicAgent.research"]),
             patch("src.agents.gap_analyst_agent.GapAnalystAgent.analyze", return_value=patches["GapAnalystAgent.analyze"]),
-            patch("src.agents.curriculum_agent.CurriculumAgent.design", return_value=patches["CurriculumAgent.design"]),
-            patch("src.agents.activities_agent.ActivitiesAgent.design", return_value=patches["ActivitiesAgent.design"]),
+            patch("src.agents.course_designer_agent.CourseDesignerAgent.design", return_value=patches["CourseDesignerAgent.design"]),
             patch("src.agents.evaluator_agent.EvaluatorAgent.design", return_value=patches["EvaluatorAgent.design"]),
         ):
             orchestrator = Orchestrator()
@@ -279,8 +272,7 @@ class TestOrchestratorIntegration:
             patch("src.agents.labor_market_agent.LaborMarketAgent.research", return_value=patches["LaborMarketAgent.research"]),
             patch("src.agents.academic_agent.AcademicAgent.research", return_value=patches["AcademicAgent.research"]),
             patch("src.agents.gap_analyst_agent.GapAnalystAgent.analyze", return_value=patches["GapAnalystAgent.analyze"]),
-            patch("src.agents.curriculum_agent.CurriculumAgent.design", return_value=patches["CurriculumAgent.design"]),
-            patch("src.agents.activities_agent.ActivitiesAgent.design", return_value=patches["ActivitiesAgent.design"]),
+            patch("src.agents.course_designer_agent.CourseDesignerAgent.design", return_value=patches["CourseDesignerAgent.design"]),
             patch("src.agents.evaluator_agent.EvaluatorAgent.design", side_effect=evaluator_side_effect),
         ):
             orchestrator = Orchestrator()

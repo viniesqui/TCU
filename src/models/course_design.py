@@ -56,13 +56,15 @@ class StudyPlan(BaseModel):
     target_audience: str = Field(description="Description in Spanish of who this course is for")
     prerequisites: list[str] = Field(default_factory=list)
     learning_objectives: list[LearningObjective]
-    weekly_schedule: list[LearningActivity]
-    evaluator: Evaluator
+    weekly_schedule: list[LearningActivity] | None = None
+    evaluator: Evaluator | None = None
     bibliography: list[str] = Field(default_factory=list, description="List of references/resources")
 
     @model_validator(mode="after")
     def check_activity_objective_refs(self) -> "StudyPlan":
         """Ensure all activity objective indices are valid references into learning_objectives."""
+        if self.weekly_schedule is None:
+            return self
         num_objectives = len(self.learning_objectives)
         for act in self.weekly_schedule:
             for idx in act.learning_objectives_addressed:

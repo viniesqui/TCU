@@ -147,6 +147,35 @@ _ACTIVITIES_SCHEMA = """
 }
 """
 
+_COURSE_DESIGN_SCHEMA = """
+{
+  "course_title": "string",
+  "course_code": "string (ej: 'TCU-501')",
+  "credits": número entero,
+  "hours_per_week": número decimal,
+  "total_weeks": número entero,
+  "target_audience": "Descripción en español de la audiencia objetivo",
+  "prerequisites": ["prerequisito1", "prerequisito2"],
+  "learning_objectives": [
+    {
+      "bloom_level": "recordar|comprender|aplicar|analizar|evaluar|crear",
+      "description": "Objetivo completo en español"
+    }
+  ],
+  "bibliography": ["Referencia 1", "Referencia 2"],
+  "weekly_schedule": [
+    {
+      "week": número entero >= 1,
+      "title": "string",
+      "activity_type": "lectura|laboratorio|proyecto|debate|caso_estudio|evaluacion|taller",
+      "description": "Descripción detallada en español",
+      "estimated_hours": número decimal > 0,
+      "learning_objectives_addressed": [índices 0-based de los objetivos definidos en este mismo documento]
+    }
+  ]
+}
+"""
+
 _EVALUATOR_SCHEMA = """
 {
   "evaluation_components": [
@@ -347,6 +376,64 @@ FORMATO DE RESPUESTA: Responde ÚNICAMENTE con JSON válido. Sin texto adicional
 
 ESQUEMA REQUERIDO:
 {_ACTIVITIES_SCHEMA}
+"""
+
+COURSE_DESIGNER_PROMPT = f"""Eres un experto en diseño curricular y pedagogía activa para cursos universitarios de tecnología en Costa Rica.
+
+TU MISIÓN: Diseñar el plan de estudios COMPLETO para un nuevo curso universitario, incluyendo objetivos de aprendizaje Y el cronograma semanal de actividades, en un único documento JSON coherente.
+
+PROCESO DE DISEÑO (sigue este orden estrictamente):
+
+FASE 1 — METADATOS Y OBJETIVOS DE APRENDIZAJE:
+1. Define el título oficial del curso y un código (formato TCU-XXX)
+2. Establece créditos universitarios (típicamente 3-4 para bachillerato en Costa Rica)
+3. Define horas por semana (1 crédito = 3 horas estudiante/semana: lectiva + independiente)
+4. Establece la duración: típicamente 16 semanas (semestre costarricense)
+5. Define la audiencia objetivo y prerrequisitos
+6. Crea 6-8 objetivos de aprendizaje usando la taxonomía de Bloom:
+   - Al menos 1 en nivel "aplicar" o superior
+   - Al menos 1 en nivel "analizar" o superior
+   - Al menos 1 en nivel "crear"
+   - Comienza cada objetivo con un verbo de acción de Bloom
+7. Incluye bibliografía actualizada (libros, recursos online, documentación oficial)
+
+VERBOS DE BLOOM POR NIVEL:
+- recordar:   identificar, listar, nombrar, reconocer, definir, describir
+- comprender: explicar, interpretar, resumir, clasificar, comparar, distinguir
+- aplicar:    usar, ejecutar, implementar, demostrar, calcular, construir
+- analizar:   diferenciar, organizar, examinar, descomponer, contrastar, inferir
+- evaluar:    juzgar, criticar, justificar, seleccionar, priorizar, argumentar
+- crear:      diseñar, construir, planificar, producir, formular, desarrollar
+
+FASE 2 — CRONOGRAMA SEMANAL DE ACTIVIDADES:
+8. Crea UNA actividad por semana (total debe coincidir con total_weeks definido arriba)
+9. CRÍTICO: En el campo "learning_objectives_addressed" usa ÚNICAMENTE índices 0-based de la
+   lista "learning_objectives" que acabas de definir en Fase 1.
+   - Índice 0 = primer objetivo, índice 1 = segundo objetivo, etc.
+   - NUNCA uses un índice mayor o igual al número total de objetivos definidos.
+   - Cada actividad debe referenciar al menos 1-2 objetivos.
+10. Distribuye los tipos de actividades pedagógicamente:
+    - Semanas 1-3: lecturas y laboratorios introductorios (fundamentos)
+    - Semanas 4-8: talleres prácticos, laboratorios, casos de estudio
+    - Semanas 9-12: proyectos, debates, aplicaciones complejas
+    - Semanas 13-15: proyecto integrador, presentaciones
+    - Semana 16: evaluación final (si aplica)
+11. Cada actividad debe tener:
+    - Título descriptivo y atractivo
+    - Tipo correcto (lectura/laboratorio/proyecto/debate/caso_estudio/evaluacion/taller)
+    - Descripción detallada de qué hacen los estudiantes (mínimo 2-3 oraciones en español)
+    - Estimación de horas realista (lecturas 1-3h, laboratorios 2-4h, proyectos 4-8h)
+
+ESTÁNDARES UNIVERSITARIOS COSTA RICA:
+- Bachillerato: 3-4 créditos, 16 semanas por semestre
+- 1 crédito = 3 horas estudiante por semana (lectiva + independiente)
+- Al menos 2 proyectos prácticos y 1 evaluación formal durante el semestre
+- Mínimo 4 tipos distintos de actividad para variedad pedagógica
+
+FORMATO DE RESPUESTA: Responde ÚNICAMENTE con JSON válido. Sin texto adicional. Sin bloques de código markdown. Solo el objeto JSON puro.
+
+ESQUEMA REQUERIDO:
+{_COURSE_DESIGN_SCHEMA}
 """
 
 EVALUATOR_PROMPT = f"""Eres un experto en evaluación del aprendizaje y diseño de rúbricas para programas universitarios de tecnología en Costa Rica.
