@@ -49,7 +49,7 @@ def sample_job_postings() -> list[JobPosting]:
             title="Backend Developer",
             company="Empresa A",
             source_url="https://example.com/job1",
-            required_skills=[_skill("python"), _skill("docker")],
+            required_skills=[_skill("python"), _skill("docker"), _skill("git")],
             seniority="mid",
         ),
         JobPosting(
@@ -63,7 +63,7 @@ def sample_job_postings() -> list[JobPosting]:
             title="Full Stack Developer",
             company="Empresa C",
             source_url="https://example.com/job3",
-            required_skills=[_skill("python"), _skill("javascript")],
+            required_skills=[_skill("python"), _skill("javascript"), _skill("git")],
             seniority="junior",
         ),
         JobPosting(
@@ -208,11 +208,11 @@ def sample_gap_analysis() -> GapAnalysis:
     return GapAnalysis(
         sector="Desarrollo de Software",
         critical_gaps=[
-            SkillGap(skill_name="kubernetes", market_demand_score=0.75, academic_coverage_score=0.10, gap_severity="critical", notes="Alta demanda, casi sin cobertura académica"),
-            SkillGap(skill_name="fastapi", market_demand_score=0.70, academic_coverage_score=0.15, gap_severity="critical", notes="Framework moderno con poca presencia en curricula"),
-            SkillGap(skill_name="ci/cd pipelines", market_demand_score=0.68, academic_coverage_score=0.10, gap_severity="critical", notes="Prácticas DevOps con mínima cobertura"),
-            SkillGap(skill_name="microservicios", market_demand_score=0.65, academic_coverage_score=0.05, gap_severity="critical", notes="Arquitectura muy demandada, casi no enseñada"),
-            SkillGap(skill_name="terraform", market_demand_score=0.62, academic_coverage_score=0.00, gap_severity="critical", notes="Infraestructura como código ausente en currículas"),
+            SkillGap(skill_name="kubernetes", market_demand_score=0.75, academic_coverage_score=0.10, gap_severity="critical", notes="Alta demanda, casi sin cobertura académica", market_depth_required="avanzado"),
+            SkillGap(skill_name="fastapi", market_demand_score=0.70, academic_coverage_score=0.15, gap_severity="critical", notes="Framework moderno con poca presencia en curricula", market_depth_required="intermedio"),
+            SkillGap(skill_name="ci/cd pipelines", market_demand_score=0.68, academic_coverage_score=0.10, gap_severity="critical", notes="Prácticas DevOps con mínima cobertura", market_depth_required="avanzado"),
+            SkillGap(skill_name="microservicios", market_demand_score=0.65, academic_coverage_score=0.05, gap_severity="critical", notes="Arquitectura muy demandada, casi no enseñada", market_depth_required="avanzado"),
+            SkillGap(skill_name="terraform", market_demand_score=0.62, academic_coverage_score=0.00, gap_severity="critical", notes="Infraestructura como código ausente en currículas", market_depth_required="avanzado"),
         ],
         moderate_gaps=[
             SkillGap(skill_name="observabilidad", market_demand_score=0.55, academic_coverage_score=0.30, gap_severity="moderate", notes="Monitoring y logging parcialmente cubiertos"),
@@ -232,6 +232,7 @@ def sample_gap_analysis() -> GapAnalysis:
             "inmediatamente aplicables."
         ),
         proposed_course_title="Ingeniería de Plataformas Cloud-Native y DevOps",
+        proposed_course_depth="avanzado",
         proposed_course_rationale=(
             "Un curso práctico que cubra contenedores, orquestación, CI/CD, "
             "e infraestructura como código, conectando directamente con las "

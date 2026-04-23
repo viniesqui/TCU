@@ -8,6 +8,7 @@ import pytest
 
 from src.models.course_design import EvaluationCriteria, Evaluator, LearningActivity, LearningObjective, StudyPlan
 from src.models.gap import SkillGap
+from src.models.market import Skill
 from src.quality.downstream_gates import ActivitiesGate, CurriculumGate, EvaluatorGate, GapAnalysisGate
 from src.quality.research_gates import AcademicResearchGate, MarketResearchGate
 
@@ -57,6 +58,22 @@ class TestMarketResearchGate:
         result = gate.evaluate(sample_industry_demand)
         assert not result.passed
         assert len(result.retry_instructions) > 50
+
+    def test_passes_when_top_skills_grounded_in_postings(self, sample_industry_demand):
+        gate = MarketResearchGate()
+        result = gate.evaluate(sample_industry_demand)
+        assert result.passed, f"Expected pass but got issues: {result.issues}"
+        assert not any("alucinada" in issue.lower() for issue in result.issues)
+
+    def test_fails_when_technical_skill_not_in_any_posting(self, sample_industry_demand):
+        # Add a high-demand technical skill absent from all job postings
+        sample_industry_demand.top_skills.append(
+            Skill(name="rust", category="technical", frequency_score=0.70)
+        )
+        gate = MarketResearchGate()
+        result = gate.evaluate(sample_industry_demand)
+        assert not result.passed
+        assert any("rust" in issue.lower() or "alucinada" in issue.lower() for issue in result.issues)
 
 
 # ---------------------------------------------------------------------------
@@ -164,6 +181,21 @@ class TestGapAnalysisGate:
         gate = GapAnalysisGate()
         result = gate.evaluate(sample_gap_analysis)
         assert not result.passed
+
+    def test_passes_when_advanced_course_matches_advanced_gaps(self, sample_gap_analysis):
+        # Fixture has advanced critical gaps and proposed_course_depth="avanzado"
+        gate = GapAnalysisGate()
+        result = gate.evaluate(sample_gap_analysis)
+        assert result.passed, f"Expected pass but got issues: {result.issues}"
+        assert not any("básico" in issue.lower() or "basico" in issue.lower() for issue in result.issues)
+
+    def test_fails_when_basic_course_mismatches_advanced_critical_gaps(self, sample_gap_analysis):
+        # Override course depth to 'basico' — fixture has critical gaps requiring 'avanzado'
+        sample_gap_analysis.proposed_course_depth = "basico"
+        gate = GapAnalysisGate()
+        result = gate.evaluate(sample_gap_analysis)
+        assert not result.passed
+        assert any("básico" in issue.lower() or "basico" in issue.lower() for issue in result.issues)
 
 
 # ---------------------------------------------------------------------------

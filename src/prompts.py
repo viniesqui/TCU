@@ -86,7 +86,8 @@ _GAP_ANALYSIS_SCHEMA = """
       "market_demand_score": 0.85,
       "academic_coverage_score": 0.10,
       "gap_severity": "critical",
-      "notes": "Explicación breve del por qué es crítica"
+      "notes": "Explicación breve del por qué es crítica",
+      "market_depth_required": "basico|intermedio|avanzado"
     }
   ],
   "moderate_gaps": [
@@ -95,7 +96,8 @@ _GAP_ANALYSIS_SCHEMA = """
       "market_demand_score": 0.60,
       "academic_coverage_score": 0.40,
       "gap_severity": "moderate",
-      "notes": "Explicación breve"
+      "notes": "Explicación breve",
+      "market_depth_required": "basico|intermedio|avanzado"
     }
   ],
   "well_covered": [
@@ -104,12 +106,14 @@ _GAP_ANALYSIS_SCHEMA = """
       "market_demand_score": 0.70,
       "academic_coverage_score": 0.85,
       "gap_severity": "covered",
-      "notes": "Bien cubierto en múltiples programas"
+      "notes": "Bien cubierto en múltiples programas",
+      "market_depth_required": "basico|intermedio|avanzado"
     }
   ],
   "opportunity_statement": "Narrativa en español justificando un nuevo curso",
   "proposed_course_title": "Título propuesto para el curso",
-  "proposed_course_rationale": "Párrafo en español explicando el curso propuesto"
+  "proposed_course_rationale": "Párrafo en español explicando el curso propuesto",
+  "proposed_course_depth": "basico|intermedio|avanzado"
 }
 """
 
@@ -287,6 +291,13 @@ PROCESO DE ANÁLISIS:
    - "moderate": media-alta demanda (score >= 0.4) y cobertura parcial (score <= 0.5)
    - "minor": demanda moderada o cobertura aceptable
    - "covered": bien cubierta por el sistema universitario
+3b. Para cada brecha, evalúa el nivel de profundidad que exige el mercado:
+   - "basico": conceptos fundamentales (nivel primer/segundo año universitario)
+   - "intermedio": dominio práctico (nivel tercer año o 1-2 años de experiencia laboral)
+   - "avanzado": expertise especializado (nivel senior o postgrado)
+   Ejemplos: Kubernetes, Terraform, microservicios, CI/CD complejo → "avanzado"
+             Python básico, Git, SQL fundamental → "basico" o "intermedio"
+             FastAPI, Docker, REST APIs → "intermedio"
 4. Identifica el conjunto de brechas críticas y moderadas que definen la oportunidad
 5. Propone un título de curso que aborde las brechas más importantes
 6. Escribe un enunciado de oportunidad convincente en español
@@ -296,6 +307,8 @@ CRITERIOS PARA EL CURSO PROPUESTO:
 - Debe ser un curso coherente (no una lista heterogénea de temas)
 - Debe tener un nombre claro y atractivo para estudiantes universitarios costarricenses
 - Puede ser a nivel de bachillerato, licenciatura, o curso de extensión universitaria
+- Establece proposed_course_depth según el nivel de las brechas críticas dominantes
+  (si las brechas críticas requieren nivel avanzado, el curso no puede ser 'basico')
 
 FORMATO DE RESPUESTA: Responde ÚNICAMENTE con JSON válido. Sin texto adicional. Sin bloques de código markdown. Solo el objeto JSON puro.
 

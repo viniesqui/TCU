@@ -87,6 +87,17 @@ class GapAnalysisGate(QualityGate):
             )
         score_components.append(1.0 if data.well_covered else 0.0)
 
+        # --- Check: depth gap — course depth must match critical gap requirements ---
+        advanced_critical = [g for g in data.critical_gaps if g.market_depth_required == "avanzado"]
+        if advanced_critical and data.proposed_course_depth == "basico":
+            names = ", ".join(g.skill_name for g in advanced_critical[:3])
+            issues.append(
+                f"El curso propuesto es de nivel 'básico' pero hay brechas críticas que requieren "
+                f"nivel avanzado: {names}. "
+                f"Ajusta proposed_course_depth a 'intermedio' o 'avanzado' para cubrir estas brechas."
+            )
+        score_components.append(0.0 if (advanced_critical and data.proposed_course_depth == "basico") else 1.0)
+
         overall_score = sum(score_components) / len(score_components) if score_components else 0.0
         return self._result(issues, overall_score)
 
@@ -104,6 +115,7 @@ class GapAnalysisGate(QualityGate):
             "- Debe haber al menos 3 brechas críticas o moderadas combinadas.",
             "- Incluye habilidades 'covered' para demostrar que comparaste exhaustivamente.",
             "- El título del curso debe ser específico, ej: 'Desarrollo de APIs con Python y FastAPI'.",
+            "- Si hay brechas críticas con market_depth_required='avanzado', el proposed_course_depth NO puede ser 'basico'.",
         ]
         return "\n".join(lines)
 

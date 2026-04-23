@@ -8,6 +8,7 @@ class SkillGap(BaseModel):
     academic_coverage_score: float = Field(ge=0.0, le=1.0, description="How well universities cover it (0-1)")
     gap_severity: Literal["critical", "moderate", "minor", "covered"]
     notes: str = Field(description="Brief explanation of the gap or coverage")
+    market_depth_required: Literal["basico", "intermedio", "avanzado"] = "intermedio"
 
 
 class GapAnalysis(BaseModel):
@@ -18,3 +19,4 @@ class GapAnalysis(BaseModel):
     opportunity_statement: str = Field(description="Narrative in Spanish: why a new course is justified")
     proposed_course_title: str = Field(description="Working title for the proposed course")
     proposed_course_rationale: str = Field(description="One paragraph in Spanish explaining the proposed course")
+    proposed_course_depth: Literal["basico", "intermedio", "avanzado"] = "intermedio"
