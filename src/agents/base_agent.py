@@ -189,19 +189,32 @@ class BaseAgent:
             logger.info(f"[{self.name}] Calling tool '{tool_name}' with input: {json.dumps(tool_input)[:200]}")
 
             if tool_name not in TOOL_REGISTRY:
-                result_content = f"ERROR: Unknown tool '{tool_name}'"
+                result_content = json.dumps({
+                    "error": f"Unknown tool '{tool_name}'",
+                    "error_code": "UNKNOWN_TOOL",
+                })
                 is_error = True
+                logger.warning(f"[{self.name}] Tool '{tool_name}' is not registered")
             else:
                 try:
                     raw_result = TOOL_REGISTRY[tool_name](**tool_input)
                     result_content = raw_result if isinstance(raw_result, str) else json.dumps(raw_result)
-                    # Detect structured error responses (tools return JSON with error+error_code)
-                    # so Claude sees is_error=True and knows to try a different approach.
+                    # Detect structured error responses returned by tools (JSON with error+error_code)
+                    # so Claude sees is_error=True and tries a different query instead of
+                    # treating empty or failed results as valid data.
                     is_error = _is_tool_error_response(result_content)
+                    if is_error:
+                        logger.warning(
+                            f"[{self.name}] Tool '{tool_name}' returned an error response: "
+                            f"{result_content[:300]}"
+                        )
                 except Exception as e:
-                    result_content = f"ERROR executing {tool_name}: {e}"
+                    result_content = json.dumps({
+                        "error": str(e),
+                        "error_code": "TOOL_EXECUTION_ERROR",
+                    })
                     is_error = True
-                    logger.warning(f"[{self.name}] Tool '{tool_name}' failed: {e}")
+                    logger.warning(f"[{self.name}] Tool '{tool_name}' raised an exception: {e}")
 
             tool_result_blocks.append({
                 "type": "tool_result",

@@ -1,0 +1,110 @@
+# Skill categorisation configuration for the ReportGenerator.
+#
+# match_order   – category names tried in sequence; first keyword hit wins.
+# display_order – order in which categories appear in the rendered report.
+# default_category – used when no keyword matches.
+# categories    – mapping of category name → list of lowercase keyword fragments.
+#
+# To support a new sector (e.g. Medical, Legal), add a new entry under
+# `categories`, list its keywords, and append it to both `match_order` and
+# `display_order` as needed — no Python changes required.
+
+match_order:
+  - "Lenguajes de Programación"
+  - "Bases de Datos"
+  - "Herramientas y Plataformas"
+  - "Habilidades Blandas"
+
+display_order:
+  - "Lenguajes de Programación"
+  - "Herramientas y Plataformas"
+  - "Bases de Datos"
+  - "Conceptos y Metodologías"
+  - "Habilidades Blandas"
+
+default_category: "Conceptos y Metodologías"
+
+categories:
+  "Lenguajes de Programación":
+    - python
+    - java
+    - javascript
+    - typescript
+    - go
+    - golang
+    - rust
+    - "c++"
+    - "c#"
+    - php
+    - ruby
+    - kotlin
+    - swift
+    - scala
+    - "r "
+    - " r,"
+    - matlab
+    - perl
+    - bash
+    - shell
+    - powershell
+    - html
+    - css
+
+  "Herramientas y Plataformas":
+    - docker
+    - kubernetes
+    - k8s
+    - git
+    - jenkins
+    - terraform
+    - ansible
+    - aws
+    - azure
+    - gcp
+    - linux
+    - nginx
+    - apache
+    - maven
+    - gradle
+    - jira
+    - confluence
+    - postman
+    - swagger
+    - graphql
+    - rest
+    - api
+
+  "Bases de Datos":
+    - sql
+    - mysql
+    - postgresql
+    - postgres
+    - mongodb
+    - mongo
+    - redis
+    - elasticsearch
+    - oracle
+    - nosql
+    - sqlite
+    - mariadb
+    - cassandra
+    - "base de datos"
+    - database
+    - firestore
+    - dynamodb
+
+  "Habilidades Blandas":
+    - "comunicación"
+    - liderazgo
+    - "trabajo en equipo"
+    - teamwork
+    - "resolución"
+    - "pensamiento crítico"
+    - creatividad
+    - adaptabilidad
+    - scrum
+    - agile
+    - kanban
+    - "gestión"
+    - "presentación"
+    - "negociación"

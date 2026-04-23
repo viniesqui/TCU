@@ -16,6 +16,7 @@ tenacity>=8.2.0
 
 # Report generation
 Jinja2>=3.1.0
+PyYAML>=6.0.0
 
 # CLI / UX
 rich>=13.7.0

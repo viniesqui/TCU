@@ -13,6 +13,7 @@ Uso:
 
 import argparse
 import logging
+import re
 import sys
 import webbrowser
 from pathlib import Path
@@ -24,6 +25,22 @@ from rich.table import Table
 from rich.text import Text
 
 console = Console()
+
+# Whitelist: letters (including Spanish accented chars), digits, spaces, hyphens.
+# Rejects path separators, shell metacharacters, quotes, and other injection vectors.
+_SECTOR_ALLOWED_RE = re.compile(r"[^a-zA-ZáéíóúüñÁÉÍÓÚÜÑ0-9 \-]")
+
+
+def _sanitize_sector(value: str) -> str:
+    """Sanitize the --sector argument using a strict character whitelist."""
+    sanitized = _SECTOR_ALLOWED_RE.sub("", value)
+    sanitized = " ".join(sanitized.split())  # collapse extra whitespace
+    if not sanitized:
+        raise argparse.ArgumentTypeError(
+            f"Sector inválido: '{value}'. "
+            "Solo se permiten letras, dígitos, espacios y guiones."
+        )
+    return sanitized
 
 
 def parse_args() -> argparse.Namespace:
@@ -40,6 +57,7 @@ Ejemplos:
     parser.add_argument(
         "--sector",
         default="Desarrollo de Software",
+        type=_sanitize_sector,
         help="Sector del mercado laboral a analizar (default: 'Desarrollo de Software')",
     )
     parser.add_argument(

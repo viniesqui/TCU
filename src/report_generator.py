@@ -3,6 +3,7 @@ from collections import defaultdict
 from datetime import datetime
 from pathlib import Path
 
+import yaml
 from jinja2 import Environment, FileSystemLoader
 
 from src.config import settings
@@ -13,41 +14,39 @@ from src.models.market import IndustryDemand
 
 logger = logging.getLogger(__name__)
 
-# Keywords used to assign skills to display categories
-_LANGUAGE_KEYWORDS = {
-    "python", "java", "javascript", "typescript", "go", "golang", "rust", "c++",
-    "c#", "php", "ruby", "kotlin", "swift", "scala", "r ", " r,", "matlab",
-    "perl", "bash", "shell", "powershell", "html", "css",
-}
-_TOOL_KEYWORDS = {
-    "docker", "kubernetes", "k8s", "git", "jenkins", "terraform", "ansible",
-    "aws", "azure", "gcp", "linux", "nginx", "apache", "maven", "gradle",
-    "jira", "confluence", "postman", "swagger", "graphql", "rest", "api",
-}
-_DB_KEYWORDS = {
-    "sql", "mysql", "postgresql", "postgres", "mongodb", "mongo", "redis",
-    "elasticsearch", "oracle", "nosql", "sqlite", "mariadb", "cassandra",
-    "base de datos", "database", "firestore", "dynamodb",
-}
-_SOFT_KEYWORDS = {
-    "comunicación", "liderazgo", "trabajo en equipo", "teamwork", "resolución",
-    "pensamiento crítico", "creatividad", "adaptabilidad", "scrum", "agile",
-    "kanban", "gestión", "presentación", "negociación",
+_CATEGORIES_CONFIG_PATH = Path(__file__).parent.parent / "config" / "categories.yaml"
+
+
+def _load_categories_config() -> dict:
+    """Load skill categorisation config from config/categories.yaml."""
+    if not _CATEGORIES_CONFIG_PATH.exists():
+        raise FileNotFoundError(
+            f"Categories config not found: {_CATEGORIES_CONFIG_PATH}. "
+            "Ensure config/categories.yaml is present in the project root."
+        )
+    with _CATEGORIES_CONFIG_PATH.open(encoding="utf-8") as fh:
+        return yaml.safe_load(fh)
+
+
+# Load once at import time so the file is read only once per process.
+_CATEGORIES_CONFIG = _load_categories_config()
+_MATCH_ORDER: list[str] = _CATEGORIES_CONFIG["match_order"]
+_DISPLAY_ORDER: list[str] = _CATEGORIES_CONFIG["display_order"]
+_DEFAULT_CATEGORY: str = _CATEGORIES_CONFIG["default_category"]
+# Build frozensets of keywords keyed by category name for O(1) membership tests.
+_CATEGORY_KEYWORDS: dict[str, frozenset[str]] = {
+    cat: frozenset(kw.lower() for kw in keywords)
+    for cat, keywords in _CATEGORIES_CONFIG["categories"].items()
 }
 
 
 def _categorize_skill(skill: str) -> str:
     """Assign a display category to a skill string based on keyword matching."""
     s = skill.lower()
-    if any(kw in s for kw in _LANGUAGE_KEYWORDS):
-        return "Lenguajes de Programación"
-    if any(kw in s for kw in _DB_KEYWORDS):
-        return "Bases de Datos"
-    if any(kw in s for kw in _TOOL_KEYWORDS):
-        return "Herramientas y Plataformas"
-    if any(kw in s for kw in _SOFT_KEYWORDS):
-        return "Habilidades Blandas"
-    return "Conceptos y Metodologías"
+    for cat_name in _MATCH_ORDER:
+        if any(kw in s for kw in _CATEGORY_KEYWORDS.get(cat_name, frozenset())):
+            return cat_name
+    return _DEFAULT_CATEGORY
 
 
 def _group_skills_by_category(skills: list[str]) -> dict[str, list[str]]:
@@ -55,19 +54,11 @@ def _group_skills_by_category(skills: list[str]) -> dict[str, list[str]]:
     groups: dict[str, list[str]] = defaultdict(list)
     for skill in skills:
         groups[_categorize_skill(skill)].append(skill)
-    # Sort skills within each category, and order categories logically
-    category_order = [
-        "Lenguajes de Programación",
-        "Herramientas y Plataformas",
-        "Bases de Datos",
-        "Conceptos y Metodologías",
-        "Habilidades Blandas",
-    ]
-    result = {}
-    for cat in category_order:
+    result: dict[str, list[str]] = {}
+    for cat in _DISPLAY_ORDER:
         if cat in groups:
             result[cat] = sorted(groups[cat])
-    # Add any unexpected categories at the end
+    # Preserve any categories added in the YAML that fall outside the display order.
     for cat, skills_list in groups.items():
         if cat not in result:
             result[cat] = sorted(skills_list)
