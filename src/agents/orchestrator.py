@@ -19,7 +19,9 @@ from __future__ import annotations
 
 import json
 import logging
+import re
 from dataclasses import dataclass, field
+from pathlib import Path
 from typing import Any
 
 from pydantic import ValidationError
@@ -39,6 +41,8 @@ from src.quality.downstream_gates import ActivitiesGate, CurriculumGate, Evaluat
 from src.quality.research_gates import AcademicResearchGate, MarketResearchGate
 
 logger = logging.getLogger(__name__)
+
+_STAGE_CACHE_DIR = Path("stage_cache")
 
 
 @dataclass
@@ -62,12 +66,18 @@ class Orchestrator:
     - Gate fails   → retry the agent with targeted retry_instructions
     - Max retries  → log warning and proceed with best available output
                      (the pipeline never hard-fails due to quality alone)
+
+    Stage checkpointing: each stage result is persisted to
+    stage_cache/{sector}_{stage}.json and reloaded on subsequent runs,
+    allowing mid-pipeline crash recovery and fast iteration during development.
     """
 
     def __init__(self, progress: Any = None) -> None:
         self.progress = progress
         self.max_retries: int = settings.max_stage_retries
         self._quality_scores: dict[str, float] = {}
+        self._sector: str = ""
+        _STAGE_CACHE_DIR.mkdir(exist_ok=True)
 
     # ------------------------------------------------------------------
     # Public interface
@@ -75,6 +85,7 @@ class Orchestrator:
 
     def run(self, sector: str = "Desarrollo de Software") -> str:
         """Execute the full pipeline. Returns path to generated HTML report."""
+        self._sector = sector
         logger.info(f"[Orchestrator] ── Pipeline start ── sector='{sector}'")
 
         # Stage 1 – Labor Market Research
@@ -117,6 +128,10 @@ class Orchestrator:
     # ------------------------------------------------------------------
 
     def _stage_market_research(self, sector: str) -> IndustryDemand:
+        cached = self._load_stage_cache("market_research", IndustryDemand)
+        if cached is not None:
+            return cached
+
         gate = MarketResearchGate()
         agent = LaborMarketAgent()
         retry_context: str | None = None
@@ -141,10 +156,12 @@ class Orchestrator:
             self._log_gate(gate_result)
 
             if gate_result.passed:
+                self._save_stage_cache("market_research", result)
                 return result
 
             if attempt > self.max_retries:
                 logger.warning(f"[Stage 1] Quality gate failed after all retries. Proceeding with best result.")
+                self._save_stage_cache("market_research", result)
                 return result
 
             retry_context = gate_result.retry_instructions
@@ -156,6 +173,10 @@ class Orchestrator:
     # ------------------------------------------------------------------
 
     def _stage_academic_research(self, sector: str) -> AcademicLandscape:
+        cached = self._load_stage_cache("academic_research", AcademicLandscape)
+        if cached is not None:
+            return cached
+
         gate = AcademicResearchGate()
         agent = AcademicAgent()
         retry_context: str | None = None
@@ -181,10 +202,12 @@ class Orchestrator:
             self._log_gate(gate_result)
 
             if gate_result.passed:
+                self._save_stage_cache("academic_research", result)
                 return result
 
             if attempt > self.max_retries:
                 logger.warning(f"[Stage 2] Quality gate failed after all retries. Proceeding with best result.")
+                self._save_stage_cache("academic_research", result)
                 return result
 
             # On first failure: try geographic broadening if suggested.
@@ -211,6 +234,10 @@ class Orchestrator:
     def _stage_gap_analysis(
         self, industry_demand: IndustryDemand, academic_landscape: AcademicLandscape
     ) -> GapAnalysis:
+        cached = self._load_stage_cache("gap_analysis", GapAnalysis)
+        if cached is not None:
+            return cached
+
         gate = GapAnalysisGate()
         agent = GapAnalystAgent()
         demand_json = industry_demand.model_dump_json(indent=2)
@@ -234,9 +261,12 @@ class Orchestrator:
             self._log_gate(gate_result)
 
             if gate_result.passed:
+                self._save_stage_cache("gap_analysis", result)
                 return result
+
             if attempt > self.max_retries:
                 logger.warning("[Stage 3] Proceeding with best result after gate failures.")
+                self._save_stage_cache("gap_analysis", result)
                 return result
 
             retry_context = gate_result.retry_instructions
@@ -248,6 +278,10 @@ class Orchestrator:
     # ------------------------------------------------------------------
 
     def _stage_course_design(self, gap_analysis: GapAnalysis) -> StudyPlan:
+        cached = self._load_stage_cache("course_design", StudyPlan)
+        if cached is not None:
+            return cached
+
         curriculum_gate = CurriculumGate()
         activities_gate = ActivitiesGate()
         agent = CourseDesignerAgent()
@@ -278,9 +312,12 @@ class Orchestrator:
             self._log_gate(activities_result)
 
             if curriculum_result.passed and activities_result.passed:
+                self._save_stage_cache("course_design", result)
                 return result
+
             if attempt > self.max_retries:
                 logger.warning("[Stage 4] Quality gate(s) failed after all retries. Proceeding with best result.")
+                self._save_stage_cache("course_design", result)
                 return result
 
             parts = [
@@ -296,6 +333,10 @@ class Orchestrator:
     # ------------------------------------------------------------------
 
     def _stage_evaluator(self, study_plan: StudyPlan) -> Evaluator:
+        cached = self._load_stage_cache("evaluator", Evaluator)
+        if cached is not None:
+            return cached
+
         gate = EvaluatorGate()
         agent = EvaluatorAgent()
         full_json = study_plan.model_dump_json(indent=2, exclude={"evaluator"})
@@ -327,10 +368,12 @@ class Orchestrator:
             self._log_gate(gate_result)
 
             if gate_result.passed:
+                self._save_stage_cache("evaluator", result)
                 return result
 
             if attempt > self.max_retries:
                 logger.warning("[Stage 5] Quality gate failed after all retries. Proceeding with best result.")
+                self._save_stage_cache("evaluator", result)
                 return result
 
             retry_context = gate_result.retry_instructions
@@ -340,6 +383,34 @@ class Orchestrator:
     # ------------------------------------------------------------------
     # Helpers
     # ------------------------------------------------------------------
+
+    def _cache_path(self, stage: str) -> Path:
+        """Return the cache file path for a given stage and current sector."""
+        key = re.sub(r"[^\w]", "_", self._sector).lower()
+        return _STAGE_CACHE_DIR / f"{key}_{stage}.json"
+
+    def _load_stage_cache(self, stage: str, model_class: Any) -> Any | None:
+        """Return a deserialized model from disk cache if the file exists, else None."""
+        path = self._cache_path(stage)
+        if not path.exists():
+            return None
+        try:
+            data = path.read_text(encoding="utf-8")
+            result = model_class.model_validate_json(data)
+            logger.info(f"[Orchestrator] Cache hit – stage='{stage}' file={path}")
+            return result
+        except Exception as e:
+            logger.warning(f"[Orchestrator] Cache read failed for stage='{stage}': {e}. Re-running stage.")
+            return None
+
+    def _save_stage_cache(self, stage: str, model: Any) -> None:
+        """Persist a Pydantic model's JSON representation to the stage cache."""
+        path = self._cache_path(stage)
+        try:
+            path.write_text(model.model_dump_json(indent=2), encoding="utf-8")
+            logger.info(f"[Orchestrator] Stage '{stage}' cached → {path}")
+        except Exception as e:
+            logger.warning(f"[Orchestrator] Cache write failed for stage='{stage}': {e}")
 
     def _log_gate(self, result) -> None:
         status = "PASSED ✓" if result.passed else "FAILED ✗"
