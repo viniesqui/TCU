@@ -1,16 +1,15 @@
 """
-Quality gates for Stages 3–5 (Gap Analysis, Curriculum, Activities).
+Quality gates for downstream reasoning stages (Gap Analysis, Course Design, Evaluator).
 
 These agents do pure reasoning — they don't search the web.
 Their gates focus on logical coherence, coverage, and pedagogical soundness.
 
-Stage 6 (Evaluator) is already covered by Pydantic's weight-sum validator,
-so no additional gate is needed there.
+The Evaluator is also covered by Pydantic's weight-sum validator.
 """
 
 from __future__ import annotations
 
-from src.models.course_design import Evaluator, LearningActivity, LearningObjective
+from src.models.course_design import Evaluator, LearningActivity, LearningObjective, StudyPlan
 from src.models.gap import GapAnalysis
 from src.quality.base_gate import QualityGate, QualityResult
 
@@ -125,18 +124,14 @@ class CurriculumGate(QualityGate):
     def gate_name(self) -> str:
         return "CurriculumGate"
 
-    def evaluate(self, data: dict) -> QualityResult:
-        """
-        data is the raw dict from _PartialStudyPlan.model_dump()
-        since StudyPlan isn't fully assembled at this stage.
-        """
+    def evaluate(self, data: StudyPlan) -> QualityResult:
         issues: list[str] = []
         score_components: list[float] = []
 
-        objectives: list[dict] = data.get("learning_objectives", [])
-        credits: int = data.get("credits", 0)
-        hours_per_week: float = data.get("hours_per_week", 0)
-        total_weeks: int = data.get("total_weeks", 0)
+        objectives: list[LearningObjective] = data.learning_objectives
+        credits: int = data.credits
+        hours_per_week: float = data.hours_per_week
+        total_weeks: int = data.total_weeks
 
         # --- Check: objectives count ---
         obj_count = len(objectives)
@@ -149,7 +144,7 @@ class CurriculumGate(QualityGate):
 
         # --- Check: Bloom's taxonomy reaches higher levels ---
         high_levels = {"analizar", "evaluar", "crear"}
-        bloom_levels_used = {obj.get("bloom_level", "") for obj in objectives}
+        bloom_levels_used = {obj.bloom_level for obj in objectives}
         high_level_count = len(bloom_levels_used & high_levels)
         if high_level_count == 0:
             issues.append(
@@ -159,7 +154,7 @@ class CurriculumGate(QualityGate):
         score_components.append(min(high_level_count / 2, 1.0))
 
         # --- Check: has "crear" level ---
-        has_crear = any(obj.get("bloom_level") == "crear" for obj in objectives)
+        has_crear = any(obj.bloom_level == "crear" for obj in objectives)
         if not has_crear:
             issues.append(
                 "Ningún objetivo en nivel 'crear'. Para un curso práctico de tecnología, "
@@ -191,7 +186,7 @@ class CurriculumGate(QualityGate):
         score_components.append(1.0 if 12 <= total_weeks <= 20 else 0.5)
 
         # --- Check: bibliography ---
-        bibliography: list = data.get("bibliography", [])
+        bibliography: list[str] = data.bibliography
         if len(bibliography) < 3:
             issues.append(
                 f"Solo {len(bibliography)} referencias bibliográficas. "

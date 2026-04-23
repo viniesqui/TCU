@@ -6,7 +6,7 @@ Each gate is tested for:
 """
 import pytest
 
-from src.models.course_design import EvaluationCriteria, Evaluator, LearningActivity, LearningObjective
+from src.models.course_design import EvaluationCriteria, Evaluator, LearningActivity, LearningObjective, StudyPlan
 from src.models.gap import SkillGap
 from src.quality.downstream_gates import ActivitiesGate, CurriculumGate, EvaluatorGate, GapAnalysisGate
 from src.quality.research_gates import AcademicResearchGate, MarketResearchGate
@@ -171,66 +171,69 @@ class TestGapAnalysisGate:
 # ---------------------------------------------------------------------------
 
 class TestCurriculumGate:
-    def _make_plan_dict(self, obj_count=7, credits=4, hours_per_week=12.0, total_weeks=16, bibliography=None):
+    _BLOOM_LEVELS = ["recordar", "comprender", "aplicar", "analizar", "evaluar", "crear", "aplicar"]
+
+    def _make_study_plan(self, obj_count=7, credits=4, hours_per_week=12.0, total_weeks=16, bibliography=None):
         objectives = [
-            {"bloom_level": level, "description": f"Objetivo {i}"}
-            for i, level in enumerate(
-                ["recordar", "comprender", "aplicar", "analizar", "evaluar", "crear", "aplicar"][:obj_count]
-            )
+            LearningObjective(bloom_level=level, description=f"Objetivo {i}")
+            for i, level in enumerate(self._BLOOM_LEVELS[:obj_count])
         ]
-        return {
-            "learning_objectives": objectives,
-            "credits": credits,
-            "hours_per_week": hours_per_week,
-            "total_weeks": total_weeks,
-            "bibliography": bibliography or ["Ref 1", "Ref 2", "Ref 3", "Ref 4"],
-        }
+        return StudyPlan(
+            course_title="Curso de Prueba",
+            course_code="TCU-001",
+            credits=credits,
+            hours_per_week=hours_per_week,
+            total_weeks=total_weeks,
+            target_audience="Estudiantes de ingeniería.",
+            learning_objectives=objectives,
+            bibliography=bibliography or ["Ref 1", "Ref 2", "Ref 3", "Ref 4"],
+        )
 
     def test_passes_with_valid_data(self):
         gate = CurriculumGate()
-        result = gate.evaluate(self._make_plan_dict())
+        result = gate.evaluate(self._make_study_plan())
         assert result.passed, f"Expected pass but got issues: {result.issues}"
 
     def test_fails_when_obj_count_below_6(self):
         gate = CurriculumGate()
-        result = gate.evaluate(self._make_plan_dict(obj_count=4))
+        result = gate.evaluate(self._make_study_plan(obj_count=4))
         assert not result.passed
         assert any("objetivos" in issue.lower() for issue in result.issues)
 
     def test_passes_with_exactly_6_objectives(self):
         gate = CurriculumGate()
-        result = gate.evaluate(self._make_plan_dict(obj_count=6))
+        result = gate.evaluate(self._make_study_plan(obj_count=6))
         assert result.passed, f"Expected pass with 6 objectives but got: {result.issues}"
 
     def test_fails_when_no_higher_bloom_levels(self):
         gate = CurriculumGate()
-        # Only "recordar" and "comprender" — no analizar/evaluar/crear
-        plan = {
-            "learning_objectives": [
-                {"bloom_level": "recordar", "description": f"Obj {i}"} for i in range(7)
+        # Only "recordar" — no analizar/evaluar/crear
+        plan = StudyPlan(
+            course_title="Test", course_code="TCU-001", credits=4,
+            hours_per_week=12.0, total_weeks=16, target_audience="Test",
+            learning_objectives=[
+                LearningObjective(bloom_level="recordar", description=f"Obj {i}") for i in range(7)
             ],
-            "credits": 4,
-            "hours_per_week": 12.0,
-            "total_weeks": 16,
-            "bibliography": ["Ref 1", "Ref 2", "Ref 3"],
-        }
+            bibliography=["Ref 1", "Ref 2", "Ref 3"],
+        )
         result = gate.evaluate(plan)
         assert not result.passed
 
     def test_fails_when_no_crear_level(self):
         gate = CurriculumGate()
-        plan = {
-            "learning_objectives": [
-                {"bloom_level": "recordar"},
-                {"bloom_level": "comprender"},
-                {"bloom_level": "aplicar"},
-                {"bloom_level": "analizar"},
-                {"bloom_level": "evaluar"},
-                {"bloom_level": "aplicar"},
+        plan = StudyPlan(
+            course_title="Test", course_code="TCU-001", credits=4,
+            hours_per_week=12.0, total_weeks=16, target_audience="Test",
+            learning_objectives=[
+                LearningObjective(bloom_level="recordar", description="Obj 1"),
+                LearningObjective(bloom_level="comprender", description="Obj 2"),
+                LearningObjective(bloom_level="aplicar", description="Obj 3"),
+                LearningObjective(bloom_level="analizar", description="Obj 4"),
+                LearningObjective(bloom_level="evaluar", description="Obj 5"),
+                LearningObjective(bloom_level="aplicar", description="Obj 6"),
             ],
-            "credits": 4, "hours_per_week": 12.0, "total_weeks": 16,
-            "bibliography": ["Ref 1", "Ref 2", "Ref 3"],
-        }
+            bibliography=["Ref 1", "Ref 2", "Ref 3"],
+        )
         result = gate.evaluate(plan)
         assert not result.passed
         assert any("crear" in issue.lower() for issue in result.issues)
@@ -238,19 +241,19 @@ class TestCurriculumGate:
     def test_fails_when_hours_too_low_for_credits(self):
         gate = CurriculumGate()
         # 4 credits → expected 12 hrs/week; 5 is below 0.8*12=9.6
-        result = gate.evaluate(self._make_plan_dict(credits=4, hours_per_week=5.0))
+        result = gate.evaluate(self._make_study_plan(credits=4, hours_per_week=5.0))
         assert not result.passed
         assert any("horas" in issue.lower() or "crédito" in issue.lower() for issue in result.issues)
 
     def test_fails_when_hours_too_high_for_credits(self):
         gate = CurriculumGate()
         # 4 credits → expected 12 hrs/week; 20 is above 1.2*12=14.4
-        result = gate.evaluate(self._make_plan_dict(credits=4, hours_per_week=20.0))
+        result = gate.evaluate(self._make_study_plan(credits=4, hours_per_week=20.0))
         assert not result.passed
 
     def test_fails_when_total_weeks_out_of_range(self):
         gate = CurriculumGate()
-        result = gate.evaluate(self._make_plan_dict(total_weeks=8))
+        result = gate.evaluate(self._make_study_plan(total_weeks=8))
         assert not result.passed
         assert any("semanas" in issue.lower() or "semestre" in issue.lower() for issue in result.issues)
 

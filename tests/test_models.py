@@ -228,3 +228,17 @@ class TestStudyPlan:
                 weekly_schedule=sample_study_plan.weekly_schedule,
                 evaluator=sample_study_plan.evaluator,
             )
+
+    def test_partial_study_plan_without_schedule_and_evaluator(self, sample_learning_objectives):
+        """StudyPlan can be instantiated without weekly_schedule or evaluator."""
+        plan = StudyPlan(
+            course_title="Curso Parcial",
+            course_code="TCU-001",
+            credits=3,
+            hours_per_week=9.0,
+            total_weeks=16,
+            target_audience="Estudiantes de informática.",
+            learning_objectives=sample_learning_objectives,
+        )
+        assert plan.weekly_schedule is None
+        assert plan.evaluator is None
