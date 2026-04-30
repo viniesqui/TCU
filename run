@@ -1,0 +1,55 @@
+#!/usr/bin/env bash
+# TCU - single entry point. Idempotent. Zero-touch.
+#   ./run                        # bootstrap then run pipeline
+#   ./run --sector "X"           # forwards args to main.py
+#   ./run test                   # bootstrap then run test suite
+set -euo pipefail
+
+cd "$(dirname "$0")"
+
+VENV=".venv"
+STAMP="$VENV/.requirements.sha256"
+PY="${PYTHON:-python3}"
+
+# 1. venv (idempotent: only created when missing)
+if [ ! -x "$VENV/bin/python" ]; then
+  echo "→ creating virtualenv at $VENV"
+  "$PY" -m venv "$VENV"
+fi
+
+# shellcheck disable=SC1091
+. "$VENV/bin/activate"
+
+# 2. dependencies (idempotent: skip when requirements.txt unchanged)
+CURRENT_HASH="$(sha256sum requirements.txt | awk '{print $1}')"
+if [ ! -f "$STAMP" ] || [ "$(cat "$STAMP" 2>/dev/null)" != "$CURRENT_HASH" ]; then
+  echo "→ syncing dependencies"
+  python -m pip install --quiet --upgrade pip
+  python -m pip install --quiet -r requirements.txt
+  echo "$CURRENT_HASH" > "$STAMP"
+fi
+
+# 3. .env (idempotent: discover from environment, prompt only when neither exists)
+if [ ! -f .env ]; then
+  if [ -z "${ANTHROPIC_API_KEY:-}" ]; then
+    if [ -t 0 ]; then
+      printf "→ ANTHROPIC_API_KEY not found. Paste it now (input hidden): "
+      stty -echo; read -r ANTHROPIC_API_KEY; stty echo; echo
+    else
+      echo "✗ ANTHROPIC_API_KEY not set and no TTY available to prompt." >&2
+      echo "  Either: export ANTHROPIC_API_KEY=... before running, or create .env manually." >&2
+      exit 1
+    fi
+  fi
+  echo "→ writing .env"
+  umask 077
+  { echo "ANTHROPIC_API_KEY=$ANTHROPIC_API_KEY"; } > .env
+fi
+
+# 4. dispatch
+if [ "${1:-}" = "test" ]; then
+  shift
+  exec pytest tests/ "$@"
+fi
+
+exec python main.py "$@"
