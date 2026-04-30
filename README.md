@@ -23,69 +23,36 @@ Cada etapa pasa por un **quality gate** automático. Si el resultado no cumple l
 ## Requisitos
 
 - Python 3.11 o superior
-- Una API key de Anthropic
+- Una API key de Anthropic (`ANTHROPIC_API_KEY`)
 
 ---
 
-## Instalación
+## Inicio rápido
+
+Un solo comando. Crea el venv, instala dependencias, configura `.env` y ejecuta el pipeline:
 
 ```bash
-# Clonar el repositorio
-git clone https://github.com/viniesqui/TCU.git
-cd TCU
-
-# Crear entorno virtual (recomendado)
-python -m venv .venv
-source .venv/bin/activate   # Windows: .venv\Scripts\activate
-
-# Instalar dependencias
-pip install -r requirements.txt
+git clone https://github.com/viniesqui/TCU.git && cd TCU
+./run
 ```
 
----
+`./run` es **idempotente**: ejecutarlo diez veces produce el mismo estado limpio. Solo recompila lo que cambió.
 
-## Configuración
-
-Crea un archivo `.env` en la raíz del proyecto:
-
-```env
-ANTHROPIC_API_KEY=sk-ant-...       # requerido
-MODEL=claude-sonnet-4-5            # opcional, default: claude-sonnet-4-5
-OUTPUT_DIR=output                  # opcional, carpeta donde se guarda el reporte
-```
+La API key se descubre automáticamente:
+1. Si `ANTHROPIC_API_KEY` está exportada en tu shell, se usa.
+2. Si existe `.env`, se respeta tal cual.
+3. Si no, se solicita una vez (entrada oculta) y se persiste en `.env`.
 
 ---
 
 ## Uso
 
-### Ejecución básica
-
-Analiza el sector por defecto ("Desarrollo de Software"):
-
 ```bash
-python main.py
-```
-
-### Especificar un sector
-
-```bash
-python main.py --sector "Ciberseguridad"
-python main.py --sector "Inteligencia Artificial"
-python main.py --sector "Ciencia de Datos"
-```
-
-### Modo verboso
-
-Muestra los logs detallados de cada agente (útil para depuración):
-
-```bash
-python main.py --sector "Ciberseguridad" --verbose
-```
-
-### Ver opciones disponibles
-
-```bash
-python main.py --help
+./run                                      # sector por defecto: "Desarrollo de Software"
+./run --sector "Ciberseguridad"
+./run --sector "Inteligencia Artificial" --verbose
+./run --help
+./run test                                 # ejecuta la suite pytest
 ```
 
 ---
@@ -114,15 +81,8 @@ El reporte HTML incluye:
 El proyecto incluye una suite de 93 pruebas automatizadas. No requieren API key — todos los agentes y llamadas HTTP están mockeados.
 
 ```bash
-# Instalar dependencias de test (ya incluidas en requirements.txt)
-pip install pytest pytest-mock
-
-# Ejecutar todos los tests
-pytest tests/ -v
-
-# Ejecutar solo un módulo específico
-pytest tests/test_quality_gates.py -v
-pytest tests/test_orchestrator.py -v
+./run test                                 # toda la suite
+./run test tests/test_quality_gates.py -v  # un módulo específico
 ```
 
 ### Módulos de test
