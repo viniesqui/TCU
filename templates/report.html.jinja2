@@ -561,6 +561,16 @@
 
 <div class="footer">
   <p>TCU – Trabajo Comunal Universitario | Sistema Multi-Agente de IA | Generado el {{ generated_date }}</p>
+  {% if review_record %}
+  <p style="margin-top: 0.4rem;">
+    Revisado por <strong>{{ review_record.reviewer }}</strong> el {{ review_record.reviewed_at }}.
+    {% if review_record.skipped %}
+      Modo automático (sin edición manual).
+    {% else %}
+      {{ review_record.accepted_skills | length }} habilidad(es) aceptada(s){% if review_record.manual_additions %}, {{ review_record.manual_additions | length }} agregada(s) manualmente{% endif %}.
+    {% endif %}
+  </p>
+  {% endif %}
   <p style="margin-top: 0.3rem; opacity: 0.7;">Este reporte fue generado automáticamente por agentes de inteligencia artificial. Los datos reflejan información disponible públicamente.</p>
 </div>
 

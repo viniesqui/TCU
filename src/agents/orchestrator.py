@@ -22,7 +22,9 @@ import logging
 import re
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any
+from typing import Any, Callable
+
+ReviewHook = Callable[["GapAnalysis"], tuple["GapAnalysis", dict | None]]
 
 from pydantic import ValidationError
 
@@ -72,10 +74,12 @@ class Orchestrator:
     allowing mid-pipeline crash recovery and fast iteration during development.
     """
 
-    def __init__(self, progress: Any = None) -> None:
+    def __init__(self, progress: Any = None, review_hook: ReviewHook | None = None) -> None:
         self.progress = progress
+        self.review_hook = review_hook
         self.max_retries: int = settings.max_stage_retries
         self._quality_scores: dict[str, float] = {}
+        self._review_record: dict | None = None
         self._sector: str = ""
         _STAGE_CACHE_DIR.mkdir(exist_ok=True)
 
@@ -100,6 +104,13 @@ class Orchestrator:
         self._progress("📊 Analizando brecha educativa...")
         gap_analysis = self._stage_gap_analysis(industry_demand, academic_landscape)
 
+        # Checkpoint – optional human review before committing to a curriculum.
+        # The hook may mutate gap_analysis (drop/add skills, edit title) and
+        # returns an audit record that flows into the final report.
+        if self.review_hook is not None:
+            logger.info("[Orchestrator] Invoking review hook for gap analysis")
+            gap_analysis, self._review_record = self.review_hook(gap_analysis)
+
         # Stage 4 – Course Design (curriculum + activities in one call)
         self._progress("📝 Diseñando plan de estudios y cronograma de actividades...")
         study_plan = self._stage_course_design(gap_analysis)
@@ -118,6 +129,7 @@ class Orchestrator:
             gap_analysis=gap_analysis,
             study_plan=study_plan,
             quality_scores=self._quality_scores,
+            review_record=self._review_record,
         )
 
         logger.info(f"[Orchestrator] ── Pipeline complete ── report={report_path}")

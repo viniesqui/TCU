@@ -78,6 +78,7 @@ class ReportGenerator:
         gap_analysis: GapAnalysis,
         study_plan: StudyPlan,
         quality_scores: dict[str, float] | None = None,
+        review_record: dict | None = None,
     ) -> Path:
         """
         Render all pipeline outputs into an HTML report.
@@ -99,6 +100,7 @@ class ReportGenerator:
             quality_scores=quality_scores or {},
             generated_date=datetime.now().strftime("%d de %B de %Y, %H:%M"),
             skills_by_category=skills_by_category,
+            review_record=review_record,
         )
 
         output_dir = Path(settings.output_dir)
