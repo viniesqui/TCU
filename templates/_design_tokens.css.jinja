@@ -1,0 +1,51 @@
+/* ============================================================================
+ * Canonical design tokens — single source of truth.
+ *
+ * SHARED between:
+ *   - the web UI:  src/web/static/style.css (duplicate block, see top of file)
+ *   - the report:  included by templates/report.html.jinja2
+ *
+ * If you change a value here, also update the same block in style.css.
+ * The legacy aliases at the bottom keep the existing report CSS working
+ * without a sweeping rename across 578 lines of report markup.
+ * ============================================================================ */
+:root {
+  /* — Brand & semantic — */
+  --brand:        #1a3c6e;
+  --brand-strong: #142e54;
+  --brand-soft:   #e8eef6;
+  --accent:       #d98920;
+  --accent-soft:  #fbf0d9;
+  --critical:     #b3271a;
+  --critical-bg:  #fde9e6;
+  --moderate:     #b85f10;
+  --moderate-bg:  #fdf0db;
+  --success:      #1f7a45;
+  --success-bg:   #e1f4ea;
+  --info:         #1f5891;
+  --info-bg:      #e6eff9;
+
+  /* — Surfaces & text — */
+  --surface-page:   #f5f7fb;
+  --surface-card:   #ffffff;
+  --surface-raised: #fafbfe;
+  --surface-sunken: #ecf0f6;
+  --text-strong:   #0f1a2b;
+  --text:          #2a3548;
+  --text-muted:    #586478;
+  --text-faint:    #8593a5;
+  --text-on-brand: #ffffff;
+
+  /* — Borders — */
+  --border-subtle: #e3e8ef;
+  --border-strong: #c8d1dc;
+
+  /* — Legacy report aliases (kept for backward compatibility) — */
+  --primary:   var(--brand);
+  --secondary: var(--info);
+  --covered:   var(--success);
+  --bg:        var(--surface-page);
+  --card:      var(--surface-card);
+  --muted:     var(--text-muted);
+  --border:    var(--border-subtle);
+}

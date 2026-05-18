@@ -94,6 +94,28 @@ let ws = null;
 let currentGap = null;
 let stageState = {};       // { [stage_id]: { status, startedAt, endedAt, attempt, maxAttempts, retryReason } }
 let elapsedTicker = null;  // setInterval handle that drives elapsed-time updates
+let lastSector = null;     // remembered for retry-with-same-sector
+let lastStartedAt = null;  // ms timestamp when the current run started
+
+// Curated adjacency map for the done screen's "analizar otro sector" hint.
+const RELATED_SECTORS = {
+  'desarrollo de software':   ['Ciberseguridad', 'DevOps y Cloud', 'Análisis de Datos'],
+  'ciberseguridad':           ['Desarrollo de Software', 'Análisis de Datos', 'DevOps y Cloud'],
+  'inteligencia artificial':  ['Análisis de Datos', 'Desarrollo de Software', 'Ciberseguridad'],
+  'análisis de datos':        ['Inteligencia Artificial', 'Desarrollo de Software', 'DevOps y Cloud'],
+  'devops y cloud':           ['Desarrollo de Software', 'Ciberseguridad', 'Análisis de Datos'],
+  'diseño ux/ui':             ['Desarrollo de Software', 'Análisis de Datos', 'Inteligencia Artificial'],
+};
+
+// Order of stages around the radar (clockwise from top).
+const RADAR_STAGES = [
+  { key: 'market_research',   label: 'Mercado' },
+  { key: 'academic_research', label: 'Academia' },
+  { key: 'gap_analysis',      label: 'Brecha' },
+  { key: 'curriculum',        label: 'Curric.' },
+  { key: 'activities',        label: 'Activ.' },
+  { key: 'evaluator',         label: 'Eval.' },
+];
 
 // ── Review state ─────────────────────────────────────────────────────────
 // Each entry: { id, source: 'critical'|'moderate'|'manual', name, demand, coverage, depth, severity, notes, accepted }
@@ -223,6 +245,8 @@ document.getElementById('form-start').addEventListener('submit', (e) => {
   const sector = document.getElementById('sector').value.trim();
   const reviewer = document.getElementById('reviewer').value.trim() || null;
   if (!sector) return;
+  lastSector = sector;
+  lastStartedAt = Date.now();
   resetStageState();
   renderPipelineTimeline();
   document.getElementById('log').innerHTML = '';
@@ -232,10 +256,40 @@ document.getElementById('form-start').addEventListener('submit', (e) => {
   connectAndStart(sector, reviewer);
 });
 
-document.getElementById('btn-restart').addEventListener('click', () => location.reload());
-document.getElementById('btn-restart-error').addEventListener('click', () => location.reload());
+document.getElementById('btn-restart').addEventListener('click', softRestart);
+document.getElementById('btn-restart-error').addEventListener('click', softRestart);
+document.getElementById('btn-retry-same')?.addEventListener('click', retryWithSameSector);
 document.getElementById('open-archive')?.addEventListener('click', openArchive);
 document.getElementById('btn-archive-back').addEventListener('click', () => show('input'));
+
+function softRestart() {
+  if (ws && ws.readyState !== WebSocket.CLOSED) {
+    try { ws.close(); } catch (e) { /* ignore */ }
+  }
+  ws = null;
+  stopElapsedTicker();
+  currentGap = null;
+  reviewSkills = [];
+  resetStageState();
+  renderPipelineTimeline();
+  document.getElementById('log').innerHTML = '';
+  document.getElementById('current-status').textContent = 'Inicializando agentes…';
+  // Refresh the recents list since a new report may have been generated.
+  renderRecentReports();
+  show('input');
+  setTimeout(() => document.getElementById('sector')?.focus(), 50);
+}
+
+function retryWithSameSector() {
+  const sector = lastSector;
+  if (!sector) { softRestart(); return; }
+  softRestart();
+  setTimeout(() => {
+    const input = document.getElementById('sector');
+    if (input) input.value = sector;
+    document.getElementById('form-start')?.requestSubmit();
+  }, 80);
+}
 
 function connectAndStart(sector, reviewer) {
   const proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
@@ -250,6 +304,10 @@ function connectAndStart(sector, reviewer) {
   ws.addEventListener('close', () => {
     appendLog('⊗ Conexión cerrada');
     stopElapsedTicker();
+    // If we close while still mid-pipeline (not on a terminal screen), warn.
+    const active = ['screen-pipeline', 'screen-review'].some(id =>
+      document.getElementById(id)?.classList.contains('active'));
+    if (active) toast('Se perdió la conexión con el servidor', 'error', 5000);
   });
   ws.addEventListener('error', () => showError('Error de conexión WebSocket.'));
 }
@@ -786,7 +844,7 @@ function buildAudit({ skipped }) {
 }
 
 // ════════════════════════════════════════════════════════════════════════
-// Completion
+// Completion (Phase 5)
 // ════════════════════════════════════════════════════════════════════════
 function onComplete(msg) {
   const now = Date.now();
@@ -800,10 +858,23 @@ function onComplete(msg) {
   renderPipelineTimeline();
   stopElapsedTicker();
 
-  const url = `/reports/${encodeURIComponent(msg.report_path)}`;
-  document.getElementById('report-link').href = url;
-  document.getElementById('report-frame').src = url;
+  const filename = msg.report_path;
+  const url = `/reports/${encodeURIComponent(filename)}`;
+  const linkEl = document.getElementById('report-link');
+  const dlEl = document.getElementById('report-download');
+  linkEl.href = url;
+  dlEl.href = url;
+  dlEl.setAttribute('download', filename);
+
+  document.getElementById('done-sector').textContent = lastSector || msg.report_path || 'Sector';
+  const tsLabel = lastStartedAt ? new Date(lastStartedAt).toLocaleString('es-CR') : '';
+  const elapsed = lastStartedAt ? Math.round((now - lastStartedAt) / 1000) : 0;
+  const tsEl = document.getElementById('done-timestamp');
+  tsEl.textContent = tsLabel ? `Generado ${tsLabel} · ${formatDuration(elapsed)}` : '';
+
   renderQualitySummary(msg.quality_scores || {});
+  renderQualityRadar(msg.quality_scores || {});
+  renderRelatedSectors(lastSector);
   show('done');
 }
 
@@ -829,14 +900,187 @@ function renderQualitySummary(scores) {
   }
 }
 
+function renderQualityRadar(scores) {
+  const target = document.getElementById('quality-radar');
+  if (!target) return;
+  const size = 220, cx = size / 2, cy = size / 2, radius = size / 2 - 32;
+  const n = RADAR_STAGES.length;
+  const point = (i, r) => {
+    const a = (i / n) * Math.PI * 2 - Math.PI / 2;
+    return [cx + Math.cos(a) * r, cy + Math.sin(a) * r];
+  };
+
+  const grid = [0.25, 0.5, 0.75, 1].map(r => {
+    const pts = RADAR_STAGES.map((_, i) => point(i, radius * r).join(',')).join(' ');
+    return `<polygon points="${pts}" class="radar-grid" />`;
+  }).join('');
+
+  const axes = RADAR_STAGES.map((_, i) => {
+    const [x, y] = point(i, radius);
+    return `<line x1="${cx}" y1="${cy}" x2="${x}" y2="${y}" class="radar-axis" />`;
+  }).join('');
+
+  const dataPts = RADAR_STAGES
+    .map((s, i) => point(i, radius * Math.max(0, Math.min(1, scores[s.key] ?? 0))).join(','))
+    .join(' ');
+  const dataPolygon = `<polygon points="${dataPts}" class="radar-data" />`;
+
+  const labels = RADAR_STAGES.map((s, i) => {
+    const [x, y] = point(i, radius + 16);
+    return `<text x="${x}" y="${y}" class="radar-label" text-anchor="middle" dominant-baseline="middle">${escape(s.label)}</text>`;
+  }).join('');
+
+  target.innerHTML = `<svg viewBox="0 0 ${size} ${size}" width="${size}" height="${size}" role="img" aria-label="Radar de calidad por etapa">
+    ${grid}${axes}${dataPolygon}${labels}
+  </svg>`;
+}
+
+function renderRelatedSectors(currentSector) {
+  const wrap = document.getElementById('related-sectors');
+  if (!wrap) return;
+  wrap.innerHTML = '';
+  const key = (currentSector || '').toLowerCase().trim();
+  const fromMap = RELATED_SECTORS[key];
+  const candidates = (fromMap || SECTOR_SUGGESTIONS).filter(s => s.toLowerCase() !== key).slice(0, 3);
+  candidates.forEach(name => {
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'chip';
+    btn.textContent = name;
+    btn.addEventListener('click', () => {
+      softRestart();
+      setTimeout(() => {
+        document.getElementById('sector').value = name;
+        document.getElementById('form-start')?.requestSubmit();
+      }, 80);
+    });
+    wrap.appendChild(btn);
+  });
+}
+
 // ════════════════════════════════════════════════════════════════════════
-// Errors
+// Errors (Phase 6)
 // ════════════════════════════════════════════════════════════════════════
+function classifyError(msg) {
+  const lower = (msg || '').toLowerCase();
+  if (/cancel/.test(lower)) {
+    return { title: 'Ejecución cancelada', summary: 'Cancelaste la ejecución. Podés volver a intentar con el mismo sector u otro distinto.' };
+  }
+  if (/anthropic_api_key|\bapi[_ ]key\b|authentication/.test(lower)) {
+    return { title: 'Falta la API key', summary: 'No se encontró ANTHROPIC_API_KEY en el servidor. Revisa tu archivo .env.' };
+  }
+  if (/json/.test(lower) && /(invalid|inválido|valid|failed.*produce)/.test(lower)) {
+    return { title: 'Respuesta inválida de un agente', summary: 'Un agente no produjo JSON válido. Esto suele ser temporal — reintenta con el mismo sector.' };
+  }
+  if (/stage \d+ failed|gate failed|insuficient/.test(lower)) {
+    return { title: 'Etapa con resultados insuficientes', summary: 'Una etapa no produjo resultados suficientes después de los reintentos. Probá con un sector más específico o más amplio.' };
+  }
+  if (/websocket|connection/.test(lower)) {
+    return { title: 'Conexión interrumpida', summary: 'Se perdió la conexión con el servidor. Verificá que el proceso siga corriendo.' };
+  }
+  return { title: 'Ocurrió un error', summary: 'La ejecución no pudo completarse. Mira los detalles técnicos abajo.' };
+}
+
 function showError(text) {
   stopElapsedTicker();
-  document.getElementById('error-message').textContent = text;
+  const c = classifyError(text);
+  document.getElementById('error-title').textContent = c.title;
+  document.getElementById('error-summary').textContent = c.summary;
+  document.getElementById('error-message').textContent = text || '(sin detalles)';
+  // Only offer "retry with same sector" if we actually know one.
+  const retryBtn = document.getElementById('btn-retry-same');
+  if (retryBtn) retryBtn.hidden = !lastSector;
   show('error');
 }
+
+// ════════════════════════════════════════════════════════════════════════
+// Toast notifications (Phase 7.6)
+// ════════════════════════════════════════════════════════════════════════
+function toast(message, kind = 'info', durationMs = 3000) {
+  const container = document.getElementById('toast-container');
+  if (!container) return;
+  const el = document.createElement('div');
+  el.className = `toast toast-${kind}`;
+  el.setAttribute('role', kind === 'error' ? 'alert' : 'status');
+  el.textContent = message;
+  container.appendChild(el);
+  requestAnimationFrame(() => el.classList.add('toast-show'));
+  setTimeout(() => {
+    el.classList.remove('toast-show');
+    setTimeout(() => el.remove(), 220);
+  }, durationMs);
+}
+
+async function copyToClipboard(text, successMsg) {
+  try {
+    await navigator.clipboard.writeText(text);
+    toast(successMsg || 'Copiado al portapapeles', 'success');
+  } catch (e) {
+    toast('No se pudo copiar al portapapeles', 'error');
+  }
+}
+
+document.getElementById('btn-copy-link')?.addEventListener('click', () => {
+  const url = document.getElementById('report-link')?.href || '';
+  copyToClipboard(url, 'Enlace copiado');
+});
+document.getElementById('btn-copy-error')?.addEventListener('click', () => {
+  const text = document.getElementById('error-message')?.textContent || '';
+  copyToClipboard(text, 'Detalles copiados');
+});
+
+// ════════════════════════════════════════════════════════════════════════
+// Keyboard shortcuts (Phase 7.1)
+// ════════════════════════════════════════════════════════════════════════
+function openKbdHelp() {
+  const overlay = document.getElementById('kbd-overlay');
+  if (!overlay) return;
+  overlay.hidden = false;
+  document.getElementById('kbd-close')?.focus();
+}
+function closeKbdHelp() {
+  const overlay = document.getElementById('kbd-overlay');
+  if (overlay) overlay.hidden = true;
+}
+document.getElementById('kbd-close')?.addEventListener('click', closeKbdHelp);
+document.getElementById('kbd-overlay')?.addEventListener('click', (e) => {
+  if (e.target.id === 'kbd-overlay') closeKbdHelp();
+});
+
+document.addEventListener('keydown', (e) => {
+  const tag = document.activeElement?.tagName;
+  const isText = tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT';
+
+  if (e.key === '?' && !isText && !e.ctrlKey && !e.metaKey && !e.altKey) {
+    e.preventDefault();
+    const overlay = document.getElementById('kbd-overlay');
+    if (overlay && overlay.hidden) openKbdHelp(); else closeKbdHelp();
+    return;
+  }
+
+  if (e.key === 'Escape') {
+    const overlay = document.getElementById('kbd-overlay');
+    if (overlay && !overlay.hidden) { closeKbdHelp(); return; }
+    if (document.getElementById('screen-archive')?.classList.contains('active')) {
+      show('input');
+      return;
+    }
+  }
+
+  if (e.key === '/' && !isText && !e.ctrlKey && !e.metaKey) {
+    e.preventDefault();
+    show('input');
+    setTimeout(() => document.getElementById('sector')?.focus(), 0);
+    return;
+  }
+
+  if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
+    if (document.getElementById('screen-review')?.classList.contains('active')) {
+      e.preventDefault();
+      document.getElementById('btn-accept')?.click();
+    }
+  }
+});
 
 // ════════════════════════════════════════════════════════════════════════
 // Archive

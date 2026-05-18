@@ -272,16 +272,38 @@
         <div class="page-header">
           <p class="page-eyebrow">Paso 4 de 4 · Completo</p>
           <h1 class="page-title">¡Reporte generado!</h1>
-          <p class="page-lead">El análisis completo está listo. Puedes abrirlo en una pestaña nueva o verlo aquí abajo.</p>
+          <p class="page-lead">El análisis completo está listo. Ábrelo en una pestaña nueva o descárgalo para compartirlo.</p>
         </div>
 
-        <div class="card">
+        <div class="card done-summary">
+          <div class="done-head">
+            <div class="done-meta">
+              <p class="muted" style="margin-bottom: var(--space-1);">Sector analizado</p>
+              <h2 id="done-sector" class="done-sector"></h2>
+              <p class="muted" id="done-timestamp"></p>
+            </div>
+            <div id="quality-radar" class="quality-radar" aria-label="Puntajes de calidad por etapa"></div>
+          </div>
+
           <div id="quality-summary" class="quality-summary"></div>
-          <div class="row">
-            <a id="report-link" href="#" target="_blank" class="primary">Abrir reporte en pestaña nueva</a>
+
+          <div class="row done-actions">
+            <a id="report-link" href="#" target="_blank" class="primary primary-lg">
+              Abrir reporte completo
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="16" height="16" aria-hidden="true">
+                <path d="M14 3h7v7"/><path d="M10 14L21 3"/><path d="M21 14v6a1 1 0 01-1 1H4a1 1 0 01-1-1V4a1 1 0 011-1h6"/>
+              </svg>
+            </a>
+            <a id="report-download" href="#" download class="ghost">Descargar HTML</a>
+            <button type="button" id="btn-copy-link" class="ghost">Copiar enlace</button>
             <button type="button" id="btn-restart" class="ghost">Nuevo análisis</button>
           </div>
-          <iframe id="report-frame" title="Reporte" loading="lazy"></iframe>
+        </div>
+
+        <div class="card related-card">
+          <h3 class="section-h" style="margin-top:0;">Analizar otro sector</h3>
+          <p class="muted">Genera un análisis para un sector relacionado en un clic.</p>
+          <div id="related-sectors" class="chip-row" role="group" aria-label="Sectores relacionados"></div>
         </div>
       </section>
 
@@ -289,14 +311,19 @@
       <section id="screen-error" class="screen">
         <div class="page-header">
           <p class="page-eyebrow" style="color: var(--critical);">Error</p>
-          <h1 class="page-title">Ocurrió un error</h1>
-          <p class="page-lead">La ejecución no pudo completarse. Revisa el detalle a continuación.</p>
+          <h1 class="page-title" id="error-title">Ocurrió un error</h1>
+          <p class="page-lead" id="error-summary">La ejecución no pudo completarse.</p>
         </div>
 
         <div class="card">
-          <pre id="error-message" class="error"></pre>
+          <details class="error-details">
+            <summary>Ver detalles técnicos</summary>
+            <pre id="error-message" class="error"></pre>
+          </details>
           <div class="row">
-            <button type="button" id="btn-restart-error" class="primary">Volver a empezar</button>
+            <button type="button" id="btn-retry-same" class="primary" hidden>Reintentar con el mismo sector</button>
+            <button type="button" id="btn-restart-error" class="ghost">Empezar de nuevo</button>
+            <button type="button" id="btn-copy-error" class="ghost">Copiar detalles</button>
           </div>
         </div>
       </section>
@@ -320,6 +347,25 @@
     </div>
   </main>
 
+</div>
+
+<!-- Toast container — populated by app.js -->
+<div id="toast-container" class="toast-container" aria-live="polite" aria-atomic="false"></div>
+
+<!-- Keyboard shortcuts overlay — toggled by '?' -->
+<div id="kbd-overlay" class="kbd-overlay" hidden role="dialog" aria-modal="true" aria-labelledby="kbd-title">
+  <div class="kbd-overlay-inner">
+    <header class="kbd-overlay-head">
+      <h2 id="kbd-title">Atajos de teclado</h2>
+      <button type="button" id="kbd-close" class="link-btn" aria-label="Cerrar">✕</button>
+    </header>
+    <dl class="kbd-list">
+      <dt><kbd>/</kbd></dt>            <dd>Enfocar el campo del sector</dd>
+      <dt><kbd>Ctrl</kbd>+<kbd>Enter</kbd></dt> <dd>Aceptar la revisión y continuar</dd>
+      <dt><kbd>Esc</kbd></dt>          <dd>Cerrar este panel · regresar al inicio</dd>
+      <dt><kbd>?</kbd></dt>            <dd>Mostrar/ocultar esta ayuda</dd>
+    </dl>
+  </div>
 </div>
 
 <script src="/static/app.js"></script>
