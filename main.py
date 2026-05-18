@@ -65,6 +65,16 @@ Ejemplos:
         action="store_true",
         help="Mostrar logs detallados de cada agente",
     )
+    parser.add_argument(
+        "--review",
+        action="store_true",
+        help="Pausar después del análisis de brecha para revisión humana antes de diseñar el curso",
+    )
+    parser.add_argument(
+        "--reviewer",
+        default=None,
+        help="Nombre del revisor (se registra en el reporte). Por defecto: usuario del sistema.",
+    )
     return parser.parse_args()
 
 
@@ -90,6 +100,21 @@ class _RichProgressAdapter:
 
     def log(self, message: str) -> None:
         self._progress.update(self._task_id, description=message)
+
+
+def _make_review_hook(progress: Progress, reviewer: str | None):
+    """Build a review hook closure that pauses the Rich progress display
+    while the educator interacts with the checkpoint."""
+    from src.cli import checkpoint
+
+    def hook(gap_analysis):
+        progress.stop()
+        try:
+            return checkpoint.review(gap_analysis, reviewer=reviewer, console=console)
+        finally:
+            progress.start()
+
+    return hook
 
 
 def _print_quality_scores(quality_scores: dict) -> None:
@@ -164,7 +189,8 @@ def main() -> None:
         progress_adapter = _RichProgressAdapter(progress, task)
 
         from src.agents.orchestrator import Orchestrator
-        orchestrator = Orchestrator(progress=progress_adapter)
+        review_hook = _make_review_hook(progress, args.reviewer) if args.review else None
+        orchestrator = Orchestrator(progress=progress_adapter, review_hook=review_hook)
 
         try:
             report_path = orchestrator.run(sector=args.sector)

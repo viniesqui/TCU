@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>TCU – Análisis de Brecha Educativa</title>
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+
+<header class="hero">
+  <div class="hero-inner">
+    <h1>TCU – Análisis de Brecha Educativa</h1>
+    <p class="tagline">Sistema multi-agente de IA · Costa Rica</p>
+  </div>
+</header>
+
+<main class="container">
+
+  <!-- ─────────────  Step 1: Sector input  ───────────── -->
+  <section id="screen-input" class="screen active card">
+    <h2>1. Selecciona el sector a analizar</h2>
+    <p class="muted">Los agentes investigarán la demanda del mercado, la oferta académica universitaria, y diseñarán un curso para cerrar la brecha.</p>
+    <form id="form-start">
+      <label class="field">
+        <span>Sector</span>
+        <input type="text" id="sector" value="Desarrollo de Software" autocomplete="off" required>
+      </label>
+      <label class="field">
+        <span>Revisor <em class="muted">(opcional)</em></span>
+        <input type="text" id="reviewer" placeholder="Tu nombre" autocomplete="off">
+      </label>
+      <div class="row">
+        <button type="submit" class="primary">Iniciar análisis</button>
+        <button type="button" id="open-archive" class="ghost">Ver reportes anteriores</button>
+      </div>
+    </form>
+  </section>
+
+  <!-- ─────────────  Step 2: Pipeline progress  ───────────── -->
+  <section id="screen-pipeline" class="screen card">
+    <h2>2. Pipeline en ejecución</h2>
+    <p id="current-status" class="muted">Inicializando agentes…</p>
+    <ol id="stage-list" class="stages">
+      <li data-stage="market"   class="pending"><span class="dot"></span><span class="label">Investigación de mercado laboral</span><span class="status"></span></li>
+      <li data-stage="academic" class="pending"><span class="dot"></span><span class="label">Investigación de oferta académica</span><span class="status"></span></li>
+      <li data-stage="gap"      class="pending"><span class="dot"></span><span class="label">Análisis de brecha</span><span class="status"></span></li>
+      <li data-stage="review"   class="pending"><span class="dot"></span><span class="label">Revisión humana</span><span class="status"></span></li>
+      <li data-stage="course"   class="pending"><span class="dot"></span><span class="label">Diseño curricular y actividades</span><span class="status"></span></li>
+      <li data-stage="eval"     class="pending"><span class="dot"></span><span class="label">Sistema de evaluación</span><span class="status"></span></li>
+      <li data-stage="report"   class="pending"><span class="dot"></span><span class="label">Generación del reporte</span><span class="status"></span></li>
+    </ol>
+    <div id="log" class="log"></div>
+  </section>
+
+  <!-- ─────────────  Step 3: Inline review  ───────────── -->
+  <section id="screen-review" class="screen card">
+    <h2>3. Revisión del análisis de brecha</h2>
+    <p class="muted">Antes de diseñar el curso, revisa las habilidades que los agentes identificaron. Desmarca las que no apliquen y agrega cualquiera que falte.</p>
+
+    <div id="review-summary" class="review-summary"></div>
+
+    <h3 class="section-h">Brechas críticas</h3>
+    <table class="skill-table" id="critical-table">
+      <thead><tr><th></th><th>Habilidad</th><th>Demanda</th><th>Cobertura</th><th>Profundidad</th></tr></thead>
+      <tbody></tbody>
+    </table>
+
+    <h3 class="section-h">Brechas moderadas</h3>
+    <table class="skill-table" id="moderate-table">
+      <thead><tr><th></th><th>Habilidad</th><th>Demanda</th><th>Cobertura</th><th>Profundidad</th></tr></thead>
+      <tbody></tbody>
+    </table>
+
+    <h3 class="section-h">Agregar habilidad manualmente</h3>
+    <div class="manual-add">
+      <input type="text" id="manual-name" placeholder="Nombre de la habilidad" autocomplete="off">
+      <select id="manual-depth">
+        <option value="basico">básico</option>
+        <option value="intermedio" selected>intermedio</option>
+        <option value="avanzado">avanzado</option>
+      </select>
+      <button type="button" id="btn-manual-add" class="ghost">Agregar</button>
+    </div>
+    <ul id="manual-list" class="manual-list"></ul>
+
+    <h3 class="section-h">Título y justificación del curso</h3>
+    <label class="field">
+      <span>Título propuesto</span>
+      <input type="text" id="course-title" autocomplete="off">
+    </label>
+    <label class="field">
+      <span>Justificación</span>
+      <textarea id="course-rationale" rows="4"></textarea>
+    </label>
+
+    <div class="row" style="margin-top: 1.5rem;">
+      <button type="button" id="btn-accept" class="primary">Aceptar y continuar</button>
+      <button type="button" id="btn-skip" class="ghost">Saltar (modo automático)</button>
+    </div>
+  </section>
+
+  <!-- ─────────────  Step 4: Final report  ───────────── -->
+  <section id="screen-done" class="screen card">
+    <h2>4. ¡Reporte generado!</h2>
+    <p class="muted">El análisis completo está listo. Puedes abrirlo en una pestaña nueva o verlo aquí abajo.</p>
+    <div id="quality-summary" class="quality-summary"></div>
+    <div class="row">
+      <a id="report-link" href="#" target="_blank" class="primary">Abrir reporte en pestaña nueva</a>
+      <button type="button" id="btn-restart" class="ghost">Nuevo análisis</button>
+    </div>
+    <iframe id="report-frame" title="Reporte" loading="lazy"></iframe>
+  </section>
+
+  <!-- ─────────────  Error state  ───────────── -->
+  <section id="screen-error" class="screen card">
+    <h2>Ocurrió un error</h2>
+    <pre id="error-message" class="error"></pre>
+    <button type="button" id="btn-restart-error" class="primary">Volver a empezar</button>
+  </section>
+
+  <!-- ─────────────  Archive sidebar (modal-ish)  ───────────── -->
+  <section id="screen-archive" class="screen card">
+    <h2>Reportes anteriores</h2>
+    <p class="muted">Reportes generados en ejecuciones previas.</p>
+    <ul id="archive-list" class="archive-list"></ul>
+    <div class="row">
+      <button type="button" id="btn-archive-back" class="ghost">Volver</button>
+    </div>
+  </section>
+
+</main>
+
+<footer class="footer">
+  <p>TCU – Sistema Multi-Agente · Análisis de brecha educativa en Costa Rica</p>
+</footer>
+
+<script src="/static/app.js"></script>
+</body>
+</html>
