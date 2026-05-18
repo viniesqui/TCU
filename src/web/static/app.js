@@ -3,11 +3,69 @@
 // Archive screen is reachable from input/done.
 
 const screens = ['input', 'pipeline', 'review', 'done', 'error', 'archive'];
+
+// Which sidebar nav item should highlight for each screen.
+const SCREEN_TO_NAV = {
+  input:    'input',
+  pipeline: 'input',
+  review:   'input',
+  done:     'input',
+  error:    'input',
+  archive:  'archive',
+};
+
 function show(name) {
   for (const s of screens) {
     document.getElementById(`screen-${s}`).classList.toggle('active', s === name);
   }
+  const navKey = SCREEN_TO_NAV[name];
+  document.querySelectorAll('.nav-item[data-nav]').forEach(btn => {
+    if (btn.dataset.nav === navKey) {
+      btn.setAttribute('aria-current', 'page');
+    } else {
+      btn.removeAttribute('aria-current');
+    }
+  });
+  // Move focus to main on screen change for keyboard / screen-reader users.
+  const main = document.getElementById('main');
+  if (main && document.activeElement && document.activeElement.tagName !== 'INPUT' && document.activeElement.tagName !== 'TEXTAREA') {
+    main.focus({ preventScroll: true });
+  }
 }
+
+// ────────────────────────────────────────────────────────────────────────
+// Theme toggle (light / dark) persisted to localStorage
+// ────────────────────────────────────────────────────────────────────────
+const THEME_KEY = 'tcu-theme';
+
+function currentTheme() {
+  const explicit = document.documentElement.getAttribute('data-theme');
+  if (explicit) return explicit;
+  return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+}
+
+function setTheme(theme) {
+  document.documentElement.setAttribute('data-theme', theme);
+  try { localStorage.setItem(THEME_KEY, theme); } catch (e) { /* ignore */ }
+}
+
+document.getElementById('theme-toggle')?.addEventListener('click', () => {
+  setTheme(currentTheme() === 'dark' ? 'light' : 'dark');
+});
+
+// ────────────────────────────────────────────────────────────────────────
+// Sidebar nav
+// ────────────────────────────────────────────────────────────────────────
+document.querySelectorAll('.nav-item[data-nav]').forEach(btn => {
+  btn.addEventListener('click', () => {
+    const target = btn.dataset.nav;
+    if (target === 'input') {
+      show('input');
+    } else if (target === 'archive') {
+      openArchive();
+    }
+  });
+});
 
 const STAGE_KEYWORDS = {
   market:   ['mercado laboral'],
