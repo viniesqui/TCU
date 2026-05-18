@@ -47,6 +47,15 @@ logger = logging.getLogger(__name__)
 _STAGE_CACHE_DIR = Path("stage_cache")
 
 
+def _short_reason(gate_result) -> str:
+    """First gate issue, truncated for UI display. Empty string if the gate has none."""
+    issues = getattr(gate_result, "issues", None) or []
+    if not issues:
+        return f"score {getattr(gate_result, 'score', 0):.0%} bajo umbral"
+    first = str(issues[0])
+    return first if len(first) <= 110 else first[:107] + "…"
+
+
 @dataclass
 class OrchestratorResult:
     """All structured outputs produced by the orchestration pipeline."""
@@ -93,35 +102,36 @@ class Orchestrator:
         logger.info(f"[Orchestrator] ── Pipeline start ── sector='{sector}'")
 
         # Stage 1 – Labor Market Research
-        self._progress("🔎 Investigando mercado laboral en Costa Rica...")
+        self._progress("🔎 Investigando mercado laboral en Costa Rica...", stage_id="market")
         industry_demand = self._stage_market_research(sector)
 
         # Stage 2 – Academic Research
-        self._progress("🎓 Investigando oferta académica universitaria...")
+        self._progress("🎓 Investigando oferta académica universitaria...", stage_id="academic")
         academic_landscape = self._stage_academic_research(sector)
 
         # Stage 3 – Gap Analysis
-        self._progress("📊 Analizando brecha educativa...")
+        self._progress("📊 Analizando brecha educativa...", stage_id="gap")
         gap_analysis = self._stage_gap_analysis(industry_demand, academic_landscape)
 
         # Checkpoint – optional human review before committing to a curriculum.
         # The hook may mutate gap_analysis (drop/add skills, edit title) and
         # returns an audit record that flows into the final report.
         if self.review_hook is not None:
+            self._progress("👤 Esperando revisión humana del análisis de brecha...", stage_id="review")
             logger.info("[Orchestrator] Invoking review hook for gap analysis")
             gap_analysis, self._review_record = self.review_hook(gap_analysis)
 
         # Stage 4 – Course Design (curriculum + activities in one call)
-        self._progress("📝 Diseñando plan de estudios y cronograma de actividades...")
+        self._progress("📝 Diseñando plan de estudios y cronograma de actividades...", stage_id="course")
         study_plan = self._stage_course_design(gap_analysis)
 
         # Stage 5 – Evaluator
-        self._progress("✅ Diseñando sistema de evaluación...")
+        self._progress("✅ Diseñando sistema de evaluación...", stage_id="eval")
         evaluator = self._stage_evaluator(study_plan)
         study_plan.evaluator = evaluator
 
         # Stage 6 – Report
-        self._progress("📄 Generando reporte HTML...")
+        self._progress("📄 Generando reporte HTML...", stage_id="report")
         from src.report_generator import ReportGenerator
         report_path = ReportGenerator().render(
             industry_demand=industry_demand,
@@ -176,6 +186,12 @@ class Orchestrator:
                 self._save_stage_cache("market_research", result)
                 return result
 
+            self._emit_retry(
+                stage_id="market",
+                attempt=attempt + 1,
+                max_attempts=self.max_retries + 1,
+                reason=_short_reason(gate_result),
+            )
             retry_context = gate_result.retry_instructions
 
         return result  # unreachable but satisfies type checker
@@ -234,7 +250,19 @@ class Orchestrator:
                     "UES (El Salvador), UNAH (Honduras), UNAN (Nicaragua), UP (Panamá) "
                     "además de las universidades costarricenses ya encontradas."
                 )
+                self._emit_retry(
+                    stage_id="academic",
+                    attempt=attempt + 1,
+                    max_attempts=self.max_retries + 1,
+                    reason="ampliando búsqueda a Centroamérica",
+                )
             else:
+                self._emit_retry(
+                    stage_id="academic",
+                    attempt=attempt + 1,
+                    max_attempts=self.max_retries + 1,
+                    reason=_short_reason(gate_result),
+                )
                 retry_context = gate_result.retry_instructions
 
         return result
@@ -281,6 +309,12 @@ class Orchestrator:
                 self._save_stage_cache("gap_analysis", result)
                 return result
 
+            self._emit_retry(
+                stage_id="gap",
+                attempt=attempt + 1,
+                max_attempts=self.max_retries + 1,
+                reason=_short_reason(gate_result),
+            )
             retry_context = gate_result.retry_instructions
 
         return result
@@ -336,6 +370,12 @@ class Orchestrator:
                 curriculum_result.retry_instructions if not curriculum_result.passed else "",
                 activities_result.retry_instructions if not activities_result.passed else "",
             ]
+            self._emit_retry(
+                stage_id="course",
+                attempt=attempt + 1,
+                max_attempts=self.max_retries + 1,
+                reason=_short_reason(curriculum_result if not curriculum_result.passed else activities_result),
+            )
             retry_context = "\n\n".join(p for p in parts if p)
 
         return result  # unreachable but satisfies type checker
@@ -388,6 +428,12 @@ class Orchestrator:
                 self._save_stage_cache("evaluator", result)
                 return result
 
+            self._emit_retry(
+                stage_id="eval",
+                attempt=attempt + 1,
+                max_attempts=self.max_retries + 1,
+                reason=_short_reason(gate_result),
+            )
             retry_context = gate_result.retry_instructions
 
         raise RuntimeError("Stage 5: unreachable")
@@ -433,10 +479,31 @@ class Orchestrator:
         for issue in result.issues:
             logger.warning(f"  ↳ {issue}")
 
-    def _progress(self, description: str) -> None:
+    def _progress(self, description: str, stage_id: str | None = None) -> None:
         if self.progress is not None:
             try:
-                self.progress.log(f"[cyan]{description}[/cyan]")
+                self.progress.log(f"[cyan]{description}[/cyan]", stage_id=stage_id)
+            except TypeError:
+                # Adapter predates the stage_id kwarg.
+                try:
+                    self.progress.log(f"[cyan]{description}[/cyan]")
+                except Exception:
+                    pass
             except Exception:
                 pass
         logger.info(f"[Orchestrator] {description}")
+
+    def _emit_retry(self, stage_id: str, attempt: int, max_attempts: int, reason: str) -> None:
+        """Notify the progress adapter that a stage is being retried after a gate failure.
+
+        Optional capability – adapters that don't implement ``retry`` are skipped.
+        """
+        if self.progress is None:
+            return
+        retry_fn = getattr(self.progress, "retry", None)
+        if retry_fn is None:
+            return
+        try:
+            retry_fn(stage_id=stage_id, attempt=attempt, max_attempts=max_attempts, reason=reason)
+        except Exception:
+            logger.debug("[Orchestrator] retry adapter call failed", exc_info=True)

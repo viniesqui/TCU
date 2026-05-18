@@ -12,10 +12,14 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
+import re
 import threading
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
+
+# Strip Rich markup like [cyan]...[/cyan] before forwarding to the browser.
+_RICH_TAG_RE = re.compile(r"\[/?[a-zA-Z][^\]]*\]")
 
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.responses import FileResponse, HTMLResponse, JSONResponse
@@ -70,8 +74,22 @@ class _WebProgressAdapter:
     def __init__(self, session: Session) -> None:
         self._session = session
 
-    def log(self, message: str) -> None:
-        self._session.push({"type": "stage_progress", "description": message})
+    def log(self, message: str, stage_id: str | None = None) -> None:
+        clean = _RICH_TAG_RE.sub("", message).strip()
+        self._session.push({
+            "type": "stage_progress",
+            "stage_id": stage_id,
+            "description": clean,
+        })
+
+    def retry(self, *, stage_id: str, attempt: int, max_attempts: int, reason: str) -> None:
+        self._session.push({
+            "type": "stage_retry",
+            "stage_id": stage_id,
+            "attempt": attempt,
+            "max_attempts": max_attempts,
+            "reason": reason,
+        })
 
 
 def _make_web_review_hook(session: Session):

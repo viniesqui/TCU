@@ -98,7 +98,8 @@ class _RichProgressAdapter:
         self._progress = rich_progress
         self._task_id = task_id
 
-    def log(self, message: str) -> None:
+    def log(self, message: str, stage_id: str | None = None) -> None:
+        # stage_id is consumed by the web adapter; the CLI shows the description only.
         self._progress.update(self._task_id, description=message)
 
 

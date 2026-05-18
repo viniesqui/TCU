@@ -78,47 +78,80 @@
       <section id="screen-input" class="screen active">
         <div class="welcome">
           <p class="page-eyebrow" style="color: rgba(255,255,255,0.85);">Paso 1 de 4</p>
-          <h1 class="welcome-title">Selecciona el sector a analizar</h1>
-          <p>Los agentes investigarán la demanda del mercado, mapearán la oferta académica universitaria, y diseñarán un curso para cerrar la brecha. La ejecución toma entre 3 y 5 minutos.</p>
+          <h1 class="welcome-title">¿Qué sector queremos analizar?</h1>
+          <p>Los agentes investigarán la demanda del mercado costarricense, mapearán la oferta académica y diseñarán un curso para cerrar la brecha. Tiempo estimado: <strong id="eta-total">≈ 6 min</strong>.</p>
         </div>
 
         <div class="card">
-          <form id="form-start">
+          <form id="form-start" novalidate>
             <label class="field">
               <span>Sector</span>
               <input type="text" id="sector" value="Desarrollo de Software" autocomplete="off" required>
+              <span class="muted">O elige uno de los sectores sugeridos:</span>
             </label>
-            <label class="field">
-              <span>Revisor <em>(opcional)</em></span>
-              <input type="text" id="reviewer" placeholder="Tu nombre" autocomplete="off">
-            </label>
-            <div class="row">
-              <button type="submit" class="primary">Iniciar análisis</button>
-              <button type="button" id="open-archive" class="ghost">Ver reportes anteriores</button>
+            <div id="sector-chips" class="chip-row" role="group" aria-label="Sectores sugeridos"></div>
+
+            <details class="disclosure">
+              <summary id="toggle-advanced" aria-expanded="false">Opciones avanzadas</summary>
+              <div id="advanced-options" class="disclosure-panel">
+                <label class="field">
+                  <span>Revisor <em>(opcional)</em></span>
+                  <input type="text" id="reviewer" placeholder="Tu nombre — aparece como auditor en el reporte" autocomplete="off">
+                </label>
+              </div>
+            </details>
+
+            <div class="row form-actions">
+              <button type="submit" class="primary primary-lg">
+                Iniciar análisis
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="16" height="16" aria-hidden="true">
+                  <path d="M5 12h14M13 5l7 7-7 7"/>
+                </svg>
+              </button>
             </div>
           </form>
+        </div>
+
+        <div class="card">
+          <h3 class="section-h" style="margin-top:0;">Qué hará el sistema</h3>
+          <ol id="stage-preview" class="preview-list"></ol>
+        </div>
+
+        <div class="card recent-card">
+          <div class="card-head">
+            <h3 class="section-h" style="margin:0;">Reportes recientes</h3>
+            <button type="button" id="open-archive" class="link-btn">Ver todos →</button>
+          </div>
+          <ul id="recent-reports" class="recent-list"></ul>
         </div>
       </section>
 
       <!-- ─────────────  Step 2: Pipeline progress  ───────────── -->
       <section id="screen-pipeline" class="screen">
         <div class="page-header">
-          <p class="page-eyebrow">Paso 2 de 4</p>
-          <h1 class="page-title">Pipeline en ejecución</h1>
-          <p class="page-lead" id="current-status">Inicializando agentes…</p>
+          <p class="page-eyebrow">Paso 2 de 4 · En curso</p>
+          <h1 class="page-title">Analizando el sector</h1>
+          <p class="page-lead" id="current-status" aria-live="polite">Inicializando agentes…</p>
         </div>
 
         <div class="card">
-          <ol id="stage-list" class="stages" aria-live="polite">
-            <li data-stage="market"   class="pending"><span class="dot"></span><span class="label">Investigación de mercado laboral</span><span class="status"></span></li>
-            <li data-stage="academic" class="pending"><span class="dot"></span><span class="label">Investigación de oferta académica</span><span class="status"></span></li>
-            <li data-stage="gap"      class="pending"><span class="dot"></span><span class="label">Análisis de brecha</span><span class="status"></span></li>
-            <li data-stage="review"   class="pending"><span class="dot"></span><span class="label">Revisión humana</span><span class="status"></span></li>
-            <li data-stage="course"   class="pending"><span class="dot"></span><span class="label">Diseño curricular y actividades</span><span class="status"></span></li>
-            <li data-stage="eval"     class="pending"><span class="dot"></span><span class="label">Sistema de evaluación</span><span class="status"></span></li>
-            <li data-stage="report"   class="pending"><span class="dot"></span><span class="label">Generación del reporte</span><span class="status"></span></li>
-          </ol>
-          <div id="log" class="log" aria-label="Bitácora técnica"></div>
+          <ol id="stage-list" class="stage-timeline" aria-live="polite"></ol>
+
+          <div class="details-wrap">
+            <button type="button" id="toggle-details" class="link-btn" aria-expanded="false" aria-controls="details-panel">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="14" height="14" aria-hidden="true">
+                <polyline points="6 9 12 15 18 9"/>
+              </svg>
+              <span class="toggle-label">Mostrar detalles técnicos</span>
+            </button>
+            <div id="details-panel" class="details-panel">
+              <div id="log" class="log" aria-label="Bitácora técnica"></div>
+            </div>
+          </div>
+
+          <div class="row pipeline-actions">
+            <button type="button" id="btn-cancel" class="ghost danger">Cancelar ejecución</button>
+          </div>
         </div>
       </section>
 
