@@ -51,9 +51,34 @@ La API key se descubre automáticamente:
 ./run                                      # sector por defecto: "Desarrollo de Software"
 ./run --sector "Ciberseguridad"
 ./run --sector "Inteligencia Artificial" --verbose
+./run --review                             # pausa antes del diseño del curso para revisión humana
+./run --review --reviewer "Tu Nombre"
 ./run --help
 ./run test                                 # ejecuta la suite pytest
+./run web                                  # interfaz web con revisión inline en el navegador
 ```
+
+### Interfaz web
+
+```bash
+./run web                  # abre http://127.0.0.1:8765 en el navegador
+./run web --port 9000      # puerto custom
+./run web --no-browser     # no abrir el navegador automáticamente
+```
+
+La interfaz web ejecuta el pipeline completo desde el navegador: input del sector, progreso en vivo de cada etapa por WebSocket, **revisión del análisis de brecha inline** (aceptar/desmarcar habilidades, agregar manualmente, editar título y justificación del curso), y reporte final renderizado en la misma página. Una ejecución a la vez.
+
+### Checkpoint humano
+
+Con `--review` (CLI) o vía la interfaz web, el pipeline se detiene después del análisis de brecha (Etapa 3) y antes del diseño del curso. El revisor puede:
+
+- Aceptar la selección detectada como está y continuar.
+- Desmarcar habilidades que no aplican al curso.
+- Agregar habilidades adicionales con su profundidad (`basico` / `intermedio` / `avanzado`).
+- Editar el título y la justificación del curso.
+- Saltar la revisión (modo automático).
+
+La decisión queda registrada en `stage_cache/<sector>_gap_review.json` y aparece como pie en el reporte HTML ("*Revisado por X el TIMESTAMP*").
 
 ---
 
