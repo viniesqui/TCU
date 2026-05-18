@@ -156,55 +156,113 @@
       </section>
 
       <!-- ─────────────  Step 3: Inline review  ───────────── -->
-      <section id="screen-review" class="screen">
+      <section id="screen-review" class="screen review-screen">
         <div class="page-header">
-          <p class="page-eyebrow">Paso 3 de 4</p>
-          <h1 class="page-title">Revisión del análisis de brecha</h1>
-          <p class="page-lead">Antes de diseñar el curso, revisa las habilidades que los agentes identificaron. Desmarca las que no apliquen y agrega cualquiera que falte.</p>
+          <p class="page-eyebrow">Paso 3 de 4 · Checkpoint humano</p>
+          <h1 class="page-title">Revisa las habilidades antes del diseño del curso</h1>
+          <p class="page-lead">Desmarca las habilidades que no apliquen al curso y agrega cualquiera que falte. Tus decisiones quedan auditadas en el reporte final.</p>
         </div>
 
-        <div class="card">
-          <div id="review-summary" class="review-summary"></div>
-
-          <h3 class="section-h">Brechas críticas</h3>
-          <table class="skill-table" id="critical-table">
-            <thead><tr><th></th><th>Habilidad</th><th>Demanda</th><th>Cobertura</th><th>Profundidad</th></tr></thead>
-            <tbody></tbody>
-          </table>
-
-          <h3 class="section-h">Brechas moderadas</h3>
-          <table class="skill-table" id="moderate-table">
-            <thead><tr><th></th><th>Habilidad</th><th>Demanda</th><th>Cobertura</th><th>Profundidad</th></tr></thead>
-            <tbody></tbody>
-          </table>
-
-          <h3 class="section-h">Agregar habilidad manualmente</h3>
-          <div class="manual-add">
-            <label class="visually-hidden" for="manual-name">Nombre de la habilidad</label>
-            <input type="text" id="manual-name" placeholder="Nombre de la habilidad" autocomplete="off">
-            <label class="visually-hidden" for="manual-depth">Profundidad</label>
-            <select id="manual-depth">
-              <option value="basico">básico</option>
-              <option value="intermedio" selected>intermedio</option>
-              <option value="avanzado">avanzado</option>
-            </select>
-            <button type="button" id="btn-manual-add" class="ghost">Agregar</button>
+        <!-- Hero summary with KPIs + opportunity statement -->
+        <div class="review-hero">
+          <div class="review-hero-head">
+            <div>
+              <p class="page-eyebrow" style="color: var(--accent);">Sector analizado</p>
+              <h2 id="review-sector" class="review-sector"></h2>
+            </div>
+            <div id="selection-counter" class="selection-counter" aria-live="polite">
+              <span class="sel-num">0</span>
+              <span class="sel-label">de 0 seleccionadas</span>
+            </div>
           </div>
-          <ul id="manual-list" class="manual-list"></ul>
+          <div class="kpi-grid" id="review-kpis"></div>
+          <p id="review-opportunity" class="review-opportunity"></p>
+        </div>
 
-          <h3 class="section-h">Título y justificación del curso</h3>
-          <label class="field">
-            <span>Título propuesto</span>
-            <input type="text" id="course-title" autocomplete="off">
-          </label>
-          <label class="field">
-            <span>Justificación</span>
-            <textarea id="course-rationale" rows="4"></textarea>
-          </label>
+        <!-- Toolbar -->
+        <div class="review-toolbar card" role="toolbar" aria-label="Filtros de habilidades">
+          <div class="toolbar-group" role="group" aria-label="Filtrar por severidad">
+            <span class="toolbar-label">Filtrar:</span>
+            <button type="button" class="filter-btn" data-filter="all" aria-pressed="true">Todas <span class="filter-count" data-count-for="all">0</span></button>
+            <button type="button" class="filter-btn" data-filter="critical" aria-pressed="false">Críticas <span class="filter-count" data-count-for="critical">0</span></button>
+            <button type="button" class="filter-btn" data-filter="moderate" aria-pressed="false">Moderadas <span class="filter-count" data-count-for="moderate">0</span></button>
+            <button type="button" class="filter-btn" data-filter="manual" aria-pressed="false">Manuales <span class="filter-count" data-count-for="manual">0</span></button>
+          </div>
+          <div class="toolbar-group">
+            <label class="toolbar-label" for="sort-select">Ordenar:</label>
+            <select id="sort-select" class="toolbar-select">
+              <option value="gap">Por brecha (demanda − cobertura)</option>
+              <option value="demand">Por demanda</option>
+              <option value="name">Alfabéticamente</option>
+            </select>
+          </div>
+          <div class="toolbar-group toolbar-end">
+            <button type="button" id="btn-select-all" class="link-btn">Marcar todas</button>
+            <button type="button" id="btn-select-none" class="link-btn">Quitar todas</button>
+          </div>
+        </div>
 
-          <div class="row" style="margin-top: 1.5rem;">
-            <button type="button" id="btn-accept" class="primary">Aceptar y continuar</button>
-            <button type="button" id="btn-skip" class="ghost">Saltar (modo automático)</button>
+        <!-- Skill cards grid -->
+        <div id="skills-grid" class="skills-grid" aria-label="Habilidades detectadas"></div>
+        <p id="skills-empty" class="muted skills-empty" hidden>Ningún resultado para este filtro.</p>
+
+        <!-- Manual addition card -->
+        <div class="card manual-card">
+          <h3 class="section-h" style="margin-top:0;">Agregar habilidad manualmente</h3>
+          <p class="muted" style="margin-bottom: var(--space-3);">¿Falta una habilidad que el sistema no detectó? Agrégala aquí — aparecerá como una tarjeta más, marcada como manual.</p>
+          <div class="manual-form">
+            <label class="field">
+              <span>Nombre</span>
+              <input type="text" id="manual-name" placeholder="Ej: Threat modeling" autocomplete="off">
+            </label>
+            <label class="field">
+              <span>Profundidad</span>
+              <select id="manual-depth">
+                <option value="basico">Básico</option>
+                <option value="intermedio" selected>Intermedio</option>
+                <option value="avanzado">Avanzado</option>
+              </select>
+            </label>
+            <label class="field manual-note-field">
+              <span>Nota <em>(opcional)</em></span>
+              <input type="text" id="manual-note" placeholder="Por qué la incluyes…" autocomplete="off">
+            </label>
+            <div class="manual-actions">
+              <button type="button" id="btn-manual-add" class="ghost">+ Agregar</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Sticky bottom panel: course title & rationale + CTAs -->
+        <div id="review-sticky" class="review-sticky">
+          <div class="review-sticky-inner">
+            <details class="course-details" open>
+              <summary>
+                <span>Curso propuesto</span>
+                <span class="muted course-title-preview" id="course-title-preview"></span>
+              </summary>
+              <div class="course-details-body">
+                <label class="field">
+                  <span>Título</span>
+                  <input type="text" id="course-title" autocomplete="off" maxlength="120">
+                  <span class="muted char-count" id="course-title-count">0/120</span>
+                </label>
+                <label class="field">
+                  <span>Justificación</span>
+                  <textarea id="course-rationale" rows="3" maxlength="800"></textarea>
+                  <span class="muted char-count" id="course-rationale-count">0/800</span>
+                </label>
+              </div>
+            </details>
+            <div class="review-actions">
+              <button type="button" id="btn-skip" class="ghost" title="Acepta todas las habilidades detectadas sin tu revisión y continúa.">Saltar revisión</button>
+              <button type="button" id="btn-accept" class="primary primary-lg">
+                <span id="accept-label">Aceptar y continuar</span>
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="16" height="16" aria-hidden="true">
+                  <path d="M5 12h14M13 5l7 7-7 7"/>
+                </svg>
+              </button>
+            </div>
           </div>
         </div>
       </section>

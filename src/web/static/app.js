@@ -92,9 +92,16 @@ document.querySelectorAll('.nav-item[data-nav]').forEach(btn => {
 // ════════════════════════════════════════════════════════════════════════
 let ws = null;
 let currentGap = null;
-let manualAdditions = [];
 let stageState = {};       // { [stage_id]: { status, startedAt, endedAt, attempt, maxAttempts, retryReason } }
 let elapsedTicker = null;  // setInterval handle that drives elapsed-time updates
+
+// ── Review state ─────────────────────────────────────────────────────────
+// Each entry: { id, source: 'critical'|'moderate'|'manual', name, demand, coverage, depth, severity, notes, accepted }
+// Manual cards have a remove button instead of a checkbox and are always "accepted" while present.
+let reviewSkills = [];
+let filterMode = 'all';   // 'all' | 'critical' | 'moderate' | 'manual'
+let sortMode = 'gap';     // 'gap' | 'demand' | 'name'
+let manualSeq = 0;
 
 function resetStageState() {
   stageState = {};
@@ -415,13 +422,31 @@ document.getElementById('btn-cancel')?.addEventListener('click', () => {
 });
 
 // ════════════════════════════════════════════════════════════════════════
-// Review screen (unchanged from PR1 — redesigned in PR3)
+// Review screen (PR3) — card grid, filter/sort, sticky course panel
 // ════════════════════════════════════════════════════════════════════════
 function onReviewRequest(gap) {
   currentGap = gap;
-  manualAdditions = [];
+  reviewSkills = [];
+  manualSeq = 0;
+  filterMode = 'all';
+  sortMode = 'gap';
 
-  // Force the stages around the review checkpoint to the right state.
+  (gap.critical_gaps || []).forEach((s, i) => reviewSkills.push({
+    id: `c${i}`, source: 'critical', name: s.skill_name,
+    demand: s.market_demand_score || 0,
+    coverage: s.academic_coverage_score || 0,
+    depth: s.market_depth_required || 'intermedio',
+    severity: 'critical', notes: s.notes || '', accepted: true,
+  }));
+  (gap.moderate_gaps || []).forEach((s, i) => reviewSkills.push({
+    id: `m${i}`, source: 'moderate', name: s.skill_name,
+    demand: s.market_demand_score || 0,
+    coverage: s.academic_coverage_score || 0,
+    depth: s.market_depth_required || 'intermedio',
+    severity: 'moderate', notes: s.notes || '', accepted: true,
+  }));
+
+  // Update the pipeline timeline (the review stage is now active).
   const now = Date.now();
   for (const id of ['market', 'academic', 'gap']) {
     const st = stageState[id];
@@ -433,106 +458,296 @@ function onReviewRequest(gap) {
   }
   renderPipelineTimeline();
 
-  renderReview(gap);
+  hydrateReview(gap);
   show('review');
 }
 
-function renderReview(gap) {
-  const critical = gap.critical_gaps || [];
-  const moderate = gap.moderate_gaps || [];
+function hydrateReview(gap) {
+  document.getElementById('review-sector').textContent = gap.sector || 'Sector';
+  document.getElementById('review-opportunity').textContent = gap.opportunity_statement || '';
+  renderKPIs(gap);
 
-  document.getElementById('review-summary').innerHTML =
-    `Sector: <strong>${escape(gap.sector)}</strong> &middot; ` +
-    `<strong>${critical.length}</strong> brechas críticas &middot; ` +
-    `<strong>${moderate.length}</strong> moderadas &middot; ` +
-    `<strong>${(gap.well_covered || []).length}</strong> ya cubiertas`;
+  const titleEl = document.getElementById('course-title');
+  const ratEl = document.getElementById('course-rationale');
+  titleEl.value = gap.proposed_course_title || '';
+  ratEl.value = gap.proposed_course_rationale || '';
+  updateCharCount(titleEl, 'course-title-count', 120);
+  updateCharCount(ratEl, 'course-rationale-count', 800);
+  updateTitlePreview();
 
-  renderSkillTable('critical-table', critical, 'c');
-  renderSkillTable('moderate-table', moderate, 'm');
+  // Reset filter UI
+  document.querySelectorAll('.filter-btn').forEach(b => {
+    b.setAttribute('aria-pressed', String(b.dataset.filter === 'all'));
+  });
+  document.getElementById('sort-select').value = sortMode;
 
-  document.getElementById('course-title').value = gap.proposed_course_title || '';
-  document.getElementById('course-rationale').value = gap.proposed_course_rationale || '';
-  document.getElementById('manual-list').innerHTML = '';
+  renderSkills();
+  updateSelectionCounter();
 }
 
-function renderSkillTable(tableId, skills, prefix) {
-  const tbody = document.querySelector(`#${tableId} tbody`);
-  tbody.innerHTML = '';
-  if (!skills.length) {
-    tbody.innerHTML = `<tr><td colspan="5" class="muted" style="padding:0.8rem; text-align:center;">— sin elementos —</td></tr>`;
-    return;
-  }
-  skills.forEach((s, i) => {
-    const id = `${prefix}${i}`;
-    const tr = document.createElement('tr');
-    tr.dataset.id = id;
-    tr.innerHTML = `
-      <td><input type="checkbox" data-id="${id}" checked></td>
-      <td>${escape(s.skill_name)}</td>
-      <td>${bar(s.market_demand_score, 'demand')}</td>
-      <td>${bar(s.academic_coverage_score, 'coverage')}</td>
-      <td>${escape(s.market_depth_required || 'intermedio')}</td>`;
-    tbody.appendChild(tr);
+function renderKPIs(gap) {
+  const critical = (gap.critical_gaps || []).length;
+  const moderate = (gap.moderate_gaps || []).length;
+  const covered = (gap.well_covered || []).length;
+  const depth = gap.proposed_course_depth || 'intermedio';
+
+  const tiles = [
+    { label: 'Brechas críticas', value: critical, kind: 'critical' },
+    { label: 'Brechas moderadas', value: moderate, kind: 'moderate' },
+    { label: 'Ya cubiertas', value: covered, kind: 'success' },
+    { label: 'Profundidad propuesta', value: capitalize(depth), kind: 'neutral' },
+  ];
+  const wrap = document.getElementById('review-kpis');
+  wrap.innerHTML = '';
+  tiles.forEach(t => {
+    const tile = document.createElement('div');
+    tile.className = `kpi-tile kpi-${t.kind}`;
+    tile.innerHTML = `
+      <span class="kpi-value">${escape(String(t.value))}</span>
+      <span class="kpi-label">${escape(t.label)}</span>
+    `;
+    wrap.appendChild(tile);
   });
-  tbody.querySelectorAll('input[type="checkbox"]').forEach(cb => {
-    cb.addEventListener('change', () => {
-      cb.closest('tr').classList.toggle('rejected', !cb.checked);
+}
+
+function renderSkills() {
+  const grid = document.getElementById('skills-grid');
+  const empty = document.getElementById('skills-empty');
+
+  let visible = reviewSkills.filter(s => {
+    if (filterMode === 'all') return true;
+    if (filterMode === 'manual') return s.source === 'manual';
+    return s.source === filterMode;
+  });
+  visible.sort(sortCompare);
+
+  grid.innerHTML = '';
+  empty.hidden = visible.length > 0;
+  visible.forEach(s => grid.appendChild(renderSkillCard(s)));
+  updateFilterCounts();
+}
+
+function sortCompare(a, b) {
+  if (sortMode === 'gap')    return (b.demand - b.coverage) - (a.demand - a.coverage);
+  if (sortMode === 'demand') return b.demand - a.demand;
+  if (sortMode === 'name')   return a.name.localeCompare(b.name, 'es');
+  return 0;
+}
+
+function renderSkillCard(s) {
+  const card = document.createElement('article');
+  card.className = `skill-card severity-${s.severity} source-${s.source}`;
+  card.dataset.id = s.id;
+  if (s.source !== 'manual' && !s.accepted) card.classList.add('rejected');
+
+  // Header
+  const head = document.createElement('header');
+  head.className = 'skill-card-head';
+
+  if (s.source === 'manual') {
+    head.innerHTML = `
+      <div class="skill-title">
+        <span class="skill-name">${escape(s.name)}</span>
+        <span class="manual-badge" title="Agregado por ti">Manual</span>
+      </div>
+      <div class="skill-head-right">
+        <span class="depth-pill depth-${escape(s.depth)}">${escape(capitalize(s.depth))}</span>
+        <button type="button" class="remove-btn" aria-label="Quitar ${escape(s.name)}">×</button>
+      </div>
+    `;
+    head.querySelector('.remove-btn').addEventListener('click', () => {
+      reviewSkills = reviewSkills.filter(x => x.id !== s.id);
+      renderSkills();
+      updateSelectionCounter();
     });
+  } else {
+    head.innerHTML = `
+      <label class="skill-check">
+        <input type="checkbox" data-id="${s.id}" ${s.accepted ? 'checked' : ''}>
+        <span class="skill-name">${escape(s.name)}</span>
+      </label>
+      <span class="depth-pill depth-${escape(s.depth)}">${escape(capitalize(s.depth))}</span>
+    `;
+    head.querySelector('input[type="checkbox"]').addEventListener('change', (e) => {
+      const skill = reviewSkills.find(x => x.id === s.id);
+      if (skill) skill.accepted = e.target.checked;
+      card.classList.toggle('rejected', !e.target.checked);
+      updateSelectionCounter();
+    });
+  }
+  card.appendChild(head);
+
+  // Demand/coverage bars
+  const meta = document.createElement('div');
+  meta.className = 'skill-meta';
+  const dPct = Math.round(s.demand * 100);
+  const cPct = Math.round(s.coverage * 100);
+  meta.innerHTML = `
+    <div class="meta-row">
+      <span class="meta-label">Demanda</span>
+      <div class="bar-track"><div class="bar-fill demand" style="width:${dPct}%"></div></div>
+      <span class="meta-val">${dPct}%</span>
+    </div>
+    <div class="meta-row">
+      <span class="meta-label">Cobertura</span>
+      <div class="bar-track"><div class="bar-fill coverage" style="width:${cPct}%"></div></div>
+      <span class="meta-val">${cPct}%</span>
+    </div>
+  `;
+  card.appendChild(meta);
+
+  // Notes (gap analyst justification or educator note)
+  if (s.notes) {
+    const det = document.createElement('details');
+    det.className = 'skill-notes-wrap';
+    det.innerHTML = `
+      <summary class="skill-notes-toggle">Ver justificación</summary>
+      <p class="skill-notes">${escape(s.notes)}</p>
+    `;
+    card.appendChild(det);
+  }
+
+  return card;
+}
+
+function updateFilterCounts() {
+  const counts = { all: reviewSkills.length, critical: 0, moderate: 0, manual: 0 };
+  reviewSkills.forEach(s => { counts[s.source]++; });
+  for (const k of Object.keys(counts)) {
+    const el = document.querySelector(`[data-count-for="${k}"]`);
+    if (el) el.textContent = counts[k];
+  }
+}
+
+function updateSelectionCounter() {
+  const selected = reviewSkills.filter(s => s.source === 'manual' || s.accepted).length;
+  const total = reviewSkills.length;
+  document.querySelector('#selection-counter .sel-num').textContent = selected;
+  document.querySelector('#selection-counter .sel-label').textContent = ` de ${total} seleccionadas`;
+  const label = document.getElementById('accept-label');
+  if (label) {
+    label.textContent = selected > 0
+      ? `Aceptar ${selected} ${selected === 1 ? 'habilidad' : 'habilidades'} y continuar`
+      : 'Continuar sin habilidades';
+  }
+}
+
+function capitalize(s) {
+  if (!s) return '';
+  return s.charAt(0).toUpperCase() + s.slice(1);
+}
+
+// ── Toolbar wiring ─────────────────────────────────────────────────────
+document.querySelectorAll('.filter-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    filterMode = btn.dataset.filter;
+    document.querySelectorAll('.filter-btn').forEach(b => {
+      b.setAttribute('aria-pressed', String(b === btn));
+    });
+    renderSkills();
   });
-}
-
-function bar(score, kind) {
-  const pct = Math.round((score || 0) * 100);
-  return `<div class="bar-cell">
-    <div class="bar-track"><div class="bar-fill ${kind}" style="width:${pct}%"></div></div>
-    <span class="bar-val">${score.toFixed(2)}</span>
-  </div>`;
-}
-
-document.getElementById('btn-manual-add').addEventListener('click', () => {
-  const name = document.getElementById('manual-name').value.trim();
-  const depth = document.getElementById('manual-depth').value;
-  if (!name) return;
-  manualAdditions.push({ name, depth });
-  renderManualList();
-  document.getElementById('manual-name').value = '';
-  document.getElementById('manual-name').focus();
 });
 
-function renderManualList() {
-  const ul = document.getElementById('manual-list');
-  ul.innerHTML = '';
-  manualAdditions.forEach((m, idx) => {
-    const li = document.createElement('li');
-    li.innerHTML = `${escape(m.name)} <em style="opacity:0.85;">${escape(m.depth)}</em>
-      <button type="button" data-idx="${idx}" aria-label="quitar">×</button>`;
-    li.querySelector('button').addEventListener('click', () => {
-      manualAdditions.splice(idx, 1);
-      renderManualList();
-    });
-    ul.appendChild(li);
-  });
-}
+document.getElementById('sort-select')?.addEventListener('change', (e) => {
+  sortMode = e.target.value;
+  renderSkills();
+});
 
-document.getElementById('btn-accept').addEventListener('click', () => sendReviewResponse(false));
-document.getElementById('btn-skip').addEventListener('click', () => sendReviewResponse(true));
+document.getElementById('btn-select-all')?.addEventListener('click', () => {
+  reviewSkills.forEach(s => { if (s.source !== 'manual') s.accepted = true; });
+  renderSkills();
+  updateSelectionCounter();
+});
+
+document.getElementById('btn-select-none')?.addEventListener('click', () => {
+  reviewSkills.forEach(s => { if (s.source !== 'manual') s.accepted = false; });
+  renderSkills();
+  updateSelectionCounter();
+});
+
+// ── Manual addition ────────────────────────────────────────────────────
+document.getElementById('btn-manual-add')?.addEventListener('click', () => {
+  const nameEl = document.getElementById('manual-name');
+  const depthEl = document.getElementById('manual-depth');
+  const noteEl = document.getElementById('manual-note');
+  const name = nameEl.value.trim();
+  const depth = depthEl.value;
+  const notes = noteEl.value.trim();
+  if (!name) { nameEl.focus(); return; }
+  reviewSkills.push({
+    id: `man${manualSeq++}`,
+    source: 'manual',
+    name,
+    demand: 0.7,
+    coverage: 0.1,
+    depth,
+    severity: 'critical',
+    notes,
+    accepted: true,
+  });
+  nameEl.value = '';
+  noteEl.value = '';
+  nameEl.focus();
+  // Switch filter to manual so the new card is visible immediately.
+  if (filterMode !== 'all' && filterMode !== 'manual') {
+    const allBtn = document.querySelector('.filter-btn[data-filter="all"]');
+    if (allBtn) allBtn.click();
+  } else {
+    renderSkills();
+    updateSelectionCounter();
+  }
+});
+
+document.getElementById('manual-name')?.addEventListener('keydown', (e) => {
+  if (e.key === 'Enter') { e.preventDefault(); document.getElementById('btn-manual-add').click(); }
+});
+
+// ── Course title / rationale char counters and preview ─────────────────
+function updateCharCount(el, countId, max) {
+  const c = document.getElementById(countId);
+  if (c) c.textContent = `${el.value.length}/${max}`;
+}
+function updateTitlePreview() {
+  const title = document.getElementById('course-title').value.trim();
+  const preview = document.getElementById('course-title-preview');
+  if (preview) preview.textContent = title ? `· ${title}` : '';
+}
+document.getElementById('course-title')?.addEventListener('input', (e) => {
+  updateCharCount(e.target, 'course-title-count', 120);
+  updateTitlePreview();
+});
+document.getElementById('course-rationale')?.addEventListener('input', (e) => {
+  updateCharCount(e.target, 'course-rationale-count', 800);
+});
+
+// ── Submit ─────────────────────────────────────────────────────────────
+document.getElementById('btn-accept')?.addEventListener('click', () => sendReviewResponse(false));
+document.getElementById('btn-skip')?.addEventListener('click', () => {
+  if (!confirm('¿Saltar la revisión? Se aceptarán todas las habilidades detectadas sin tu intervención.')) return;
+  sendReviewResponse(true);
+});
 
 function sendReviewResponse(skipped) {
   const acceptedIds = [];
-  document.querySelectorAll('#screen-review input[type="checkbox"]').forEach(cb => {
-    if (cb.checked) acceptedIds.push(cb.dataset.id);
+  const manuals = [];
+  reviewSkills.forEach(s => {
+    if (s.source === 'manual') {
+      manuals.push({ name: s.name, depth: s.depth, notes: s.notes });
+    } else if (s.accepted) {
+      acceptedIds.push(s.id);
+    }
   });
-  const accepted = (currentGap.critical_gaps || []).filter((_, i) => acceptedIds.includes(`c${i}`)).length
-    + (currentGap.moderate_gaps || []).filter((_, i) => acceptedIds.includes(`m${i}`)).length;
+  const accepted = acceptedIds.length + manuals.length;
+
   const payload = skipped
     ? { skipped: true, audit: buildAudit({ skipped: true, accepted, manualCount: 0 }) }
     : {
         skipped: false,
         accepted_ids: acceptedIds,
-        manual_additions: manualAdditions,
+        manual_additions: manuals,
         proposed_course_title: document.getElementById('course-title').value.trim(),
         proposed_course_rationale: document.getElementById('course-rationale').value.trim(),
-        audit: buildAudit({ skipped: false, accepted, manualCount: manualAdditions.length }),
+        audit: buildAudit({ skipped: false, accepted, manualCount: manuals.length }),
       };
   ws.send(JSON.stringify({ type: 'review_response', payload }));
 
@@ -546,28 +761,27 @@ function sendReviewResponse(skipped) {
   show('pipeline');
 }
 
-function buildAudit({ skipped, accepted, manualCount }) {
+function buildAudit({ skipped }) {
   const reviewer = (document.getElementById('reviewer').value.trim()) || 'web-user';
   const acceptedNames = [];
   if (!skipped) {
-    document.querySelectorAll('#screen-review input[type="checkbox"]:checked').forEach(cb => {
-      const id = cb.dataset.id;
-      const idx = parseInt(id.slice(1), 10);
-      const bucket = id[0] === 'c' ? currentGap.critical_gaps : currentGap.moderate_gaps;
-      if (bucket && bucket[idx]) acceptedNames.push(bucket[idx].skill_name);
+    reviewSkills.forEach(s => {
+      if (s.source === 'manual' || s.accepted) acceptedNames.push(s.name);
     });
-    manualAdditions.forEach(m => acceptedNames.push(m.name));
   } else {
-    (currentGap.critical_gaps || []).forEach(s => acceptedNames.push(s.skill_name));
-    (currentGap.moderate_gaps || []).forEach(s => acceptedNames.push(s.skill_name));
+    reviewSkills.forEach(s => acceptedNames.push(s.name));
   }
   return {
     reviewer,
     reviewed_at: new Date().toISOString(),
     skipped,
     accepted_skills: acceptedNames,
-    manual_additions: skipped ? [] : manualAdditions.map(m => ({ name: m.name, depth: m.depth })),
-    proposed_course_title: skipped ? currentGap.proposed_course_title : document.getElementById('course-title').value.trim(),
+    manual_additions: skipped
+      ? []
+      : reviewSkills.filter(s => s.source === 'manual').map(s => ({ name: s.name, depth: s.depth, notes: s.notes })),
+    proposed_course_title: skipped
+      ? (currentGap?.proposed_course_title || '')
+      : document.getElementById('course-title').value.trim(),
   };
 }
 

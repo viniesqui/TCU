@@ -135,12 +135,14 @@ def _apply_review(original: GapAnalysis, payload: dict) -> GapAnalysis:
         depth = (addition.get("depth") or "intermedio").lower()
         if not name or depth not in ("basico", "intermedio", "avanzado"):
             continue
+        educator_note = (addition.get("notes") or "").strip()
+        notes = educator_note or "Agregado manualmente por el educador durante revisión."
         critical.append(SkillGap(
             skill_name=name,
             market_demand_score=0.7,
             academic_coverage_score=0.1,
             gap_severity="critical",
-            notes="Agregado manualmente por el educador durante revisión.",
+            notes=notes,
             market_depth_required=depth,  # type: ignore[arg-type]
         ))
 
