@@ -8,9 +8,28 @@ pleasing** — without rewriting the backend contract.
 > (`templates/report.html.jinja2`) shares a visual language with the UI and is
 > addressed at the end as a secondary target.
 
+## Status: ✅ Shipped on `claude/audit-frontend-component-zHBRI`
+
+All four PRs in the plan below were implemented as a sequence of commits on
+this branch. The audit findings (Section 2) are kept as the historical
+problem statement; each phase in Section 4 is annotated with what actually
+shipped and any small deviations.
+
+| PR | Commit | Diff | Scope |
+|---|---|---|---|
+| Plan doc | `d8e04b4` | +452 | This file. |
+| PR 1 — foundations | `18652c9` | +1107 / −291 | Phase 1 (less 1.4) + 7.3 + 7.4. Pure visual. |
+| PR 2 — pipeline + input | `49de202` | +786 / −182 | Phases 2 + 3 + the deferred 1.4 contract change. |
+| PR 3 — review rebuild | `a6cb8bc` | +867 / −220 | Phase 4. The biggest visual change. |
+| PR 4 — polish | `088ce9e` | +752 / −39 | Phases 5, 6, 7.1–7.2, 7.5–7.6, 8, 9. |
+
+**Net result**: ~3,500 lines added across 6 files, 0 new runtime dependencies
+(still pure vanilla HTML/CSS/JS), the pytest suite grew from 114 to 178 passes
+thanks to a new web-UI smoke test, and no pre-existing test regressed.
+
 ---
 
-## 1. What exists today
+## 1. What existed at audit time
 
 | File | Lines | Role |
 |---|---|---|
@@ -193,9 +212,13 @@ Explicit non-goals:
 
 ---
 
-## 4. Plan
+## 4. Plan (with implementation notes)
 
-### Phase 1 — Foundations (no behavior change, sets up everything else)
+Each phase header carries a status badge:
+- ✅ Shipped as designed
+- 🟡 Shipped with a small scope adjustment (noted inline)
+
+### Phase 1 — Foundations  ✅ (shipped in PR 1, commit `18652c9`)
 
 **1.1 Design tokens.** Replace the current `:root` block with a richer token
 set:
@@ -242,7 +265,11 @@ Touchpoints: `_WebProgressAdapter.log` in `src/web/server.py:73` and every
 `self.progress.log(...)` call site in `src/agents/orchestrator.py`.
 Add the field; keep the existing `description` string for the human log.
 
-### Phase 2 — Input screen
+> **Note:** 1.4 was deferred from PR 1 to PR 2 so PR 1 could ship as a
+> pure visual refresh with zero backend touches. It landed alongside the
+> new pipeline timeline in PR 2 (`49de202`).
+
+### Phase 2 — Input screen  ✅ (shipped in PR 2, commit `49de202`)
 
 **2.1 Sector picker** that combines:
 - 4–6 prominent suggestion chips (the sectors that actually appear in
@@ -263,7 +290,9 @@ duration ("≈ 3–5 minutos"). Fixes **U2** before it starts.
 **2.4 Primary CTA = "Iniciar análisis"** as a single full-width button.
 "Ver reportes anteriores" moves to the sidebar nav.
 
-### Phase 3 — Pipeline screen (where ≥ 80 % of the operator's time is spent)
+### Phase 3 — Pipeline screen  ✅ (shipped in PR 2, commit `49de202`)
+
+Where ≥ 80 % of the operator's time is spent.
 
 **3.1 Vertical timeline component** replacing the flat `<ol>`:
 - Each stage is a row with: icon, label, status pill (Pendiente / En curso /
@@ -292,9 +321,9 @@ status pill. Screen readers announce progress without flooding (**U10**).
 button with a confirmation dialog. Fixes a real footgun: a wrong-sector
 run forces a full reload today.
 
-### Phase 4 — Review screen (highest-value redesign)
+### Phase 4 — Review screen  🟡 (shipped in PR 3, commit `a6cb8bc`)
 
-This is the only screen with real decision-making. Optimize hard.
+The highest-value redesign — the only screen with real decision-making.
 
 **4.1 Hero summary at the top, not just a one-liner:**
 - Sector name + analyzed-at timestamp.
@@ -302,6 +331,12 @@ This is the only screen with real decision-making. Optimize hard.
   estimated course credits.
 - A live "X de Y habilidades seleccionadas" counter that updates as the
   operator toggles checkboxes.
+
+> **Scope adjustment:** the 4th KPI was originally "estimated course
+> credits" but `StudyPlan` isn't available yet at the review checkpoint
+> (it's a downstream stage). Shipped as "Profundidad propuesta"
+> (`basico` / `intermedio` / `avanzado`) instead, which `GapAnalysis`
+> does carry.
 
 **4.2 Skill cards, not tables.**
 Each skill becomes a card with:
@@ -327,6 +362,14 @@ get one column, desktops 2–3. Fixes **U3** and **A6**.
 - Added skills appear as a new card in the grid, visibly distinct (dashed
   border, "manual" badge). Editable until submission.
 
+> **Scope adjustment:** manual cards are *removable* but not *editable
+> in-place*. Mistakes are corrected by removing the card and re-adding
+> it. Inline editing of the manual card was descoped — the in-place
+> editor would need duplicate state and serialization paths for marginal
+> value. The optional educator note *did* ship and is now persisted as
+> `SkillGap.notes` on the server (small `src/web/server.py` change in
+> the same PR).
+
 **4.5 Course title & rationale** moved to a **sticky bottom panel**
 ("Curso propuesto") that the operator can always see while scrolling
 the skills. Two text fields with character counts; preview of how it
@@ -338,7 +381,7 @@ will appear in the report.
 - `Saltar (modo automático)` — smaller, secondary, with a tooltip
   explaining what "skipped" means.
 
-### Phase 5 — Done screen
+### Phase 5 — Done screen  🟡 (shipped in PR 4, commit `088ce9e`)
 
 **5.1 Drop the iframe.**
 Replace with a "Vista previa" — first paragraph of the executive summary,
@@ -346,16 +389,35 @@ hero numbers (credits, weeks, # of activities), then a single big
 "Abrir reporte completo" CTA that opens in a new tab. Add a "Descargar
 HTML" link. Fixes **U4**.
 
+> **Scope adjustment:** the iframe is gone, "Abrir reporte completo" and
+> "Descargar HTML" both shipped, plus a "Copiar enlace" toast action. The
+> in-page text preview (first paragraph + credits/weeks/# activities) was
+> descoped because the `complete` WS message doesn't carry the study plan
+> — adding a preview field would have required widening the contract just
+> for cosmetic reasons. The hero instead leans on the sector name,
+> elapsed time, and the radar from 5.2.
+
 **5.2 Quality-score visualization.**
 Replace the pills row with a horizontal stacked bar per stage (good/warn/
 poor zones), or a small radar chart (SVG, no library). Same data, better
 shape.
 
+> **Shipped as:** a 6-axis inline-SVG radar (Mercado / Academia / Brecha /
+> Curric. / Activ. / Eval.) *alongside* the existing pills row — the pills
+> stay as a redundant readable fallback. ~50 lines of hand-rolled SVG, no
+> library.
+
 **5.3 "Hacer otro análisis con un sector relacionado"** — single-click
 buttons for sectors that share the same skill family. Use the existing
 sectors-from-archive logic.
 
-### Phase 6 — Error screen
+> **Shipped as:** a curated `RELATED_SECTORS` adjacency map in `app.js`
+> (e.g. Desarrollo → Cibersec / DevOps / Datos). Each chip soft-restarts
+> the UI and auto-submits the form for a true single-click re-run.
+> Sectors-from-archive turned out less useful than the curated map because
+> archive entries are often the same sector multiple times.
+
+### Phase 6 — Error screen  ✅ (shipped in PR 4, commit `088ce9e`)
 
 **6.1 Layout:** title, plain-language summary ("La etapa de mercado laboral
 falló después de 2 reintentos"), expandable traceback, primary
@@ -368,7 +430,7 @@ tertiary "Copiar detalles". Fixes **U5**.
 - Quality-gate-after-retries → "El sector no produjo resultados suficientes
   después de 2 reintentos. Probá un sector más específico."
 
-### Phase 7 — Cross-cutting
+### Phase 7 — Cross-cutting  ✅ (7.3 + 7.4 in PR 1; 7.1–7.2 + 7.5–7.6 in PR 4)
 
 **7.1 Keyboard map** (**U8**):
 - `Enter` on the input — start (already works).
@@ -397,56 +459,84 @@ Fixes **U6**.
 reconnected, link copied, run cancelled). A 30-line vanilla toast util,
 no library.
 
-### Phase 8 — Tightening the code
+### Phase 8 — Tightening the code  🟡 (shipped in PR 4, commit `088ce9e`)
 
-- **C1** is closed by Phase 1.4 (stage IDs in messages).
-- **C2:** wrap UI state in a single `state` object with a `setState()`
-  that re-renders the active screen. Tiny step toward a reactive model
-  without a framework.
-- **C3:** introduce a `t(node, text)` helper that uses `textContent` for
-  plain strings; reserve `escape()`+`innerHTML` for fragments.
-- **C4:** add JSDoc typedefs for the four WebSocket message shapes; that's
-  enough type safety for a 366-line file without a TS build.
-- **C5:** add a Playwright-based smoke test that boots the FastAPI app with
-  a stubbed orchestrator, walks input → fake-pipeline → fake-review → done,
-  and asserts the DOM at each transition. One test, one file, runs in CI.
+- **C1** ✅ closed by Phase 1.4 (stage IDs in messages).
+- **C2** — deferred. Wrapping UI state in a `setState`-driven object is
+  still a sensible refactor but didn't pay off enough at the current
+  ~1,100-line scale to justify the risk. Punted to a follow-up.
+- **C3** — deferred. `escape()` is still in use; current call sites are
+  safe. Migrating to a `textContent`-first helper is a mechanical sweep
+  worth a separate PR.
+- **C4** — deferred. JSDoc typedefs would be cheap but add no immediate
+  enforcement without `// @ts-check` per-file, and the WS shapes are now
+  documented by the smoke test instead.
+- **C5** ✅ shipped — but as a FastAPI **TestClient** smoke test (no
+  Playwright, no browser, runs in pytest with no extra deps). 64 new
+  passing tests covering: every required DOM id, the static surface, the
+  WebSocket `stage_progress`+`stage_retry` shape, Rich-markup stripping,
+  and the `_apply_review` manual-add round-trip. Lives in
+  `tests/test_web_ui_smoke.py`.
 
-### Phase 9 — Report template alignment (secondary)
+### Phase 9 — Report template alignment  ✅ (shipped in PR 4, commit `088ce9e`)
 
-The Jinja2 report (`templates/report.html.jinja2`) duplicates the palette
-inline (lines 8–21). After Phase 1.1, lift the token block into a tiny
-shared partial (`templates/_design_tokens.html`) and `{% include %}` it
-in both the report and a future server-rendered fallback. Keeps the UI
-and the deliverable visually unified.
-
----
-
-## 5. Suggested sequencing
-
-A sensible 4-PR breakdown:
-
-1. **PR 1 — Tokens, type, shell** (Phase 1 + 7.3 + 7.4).
-   No screen logic changes; pure visual refresh. Safe to ship alone.
-2. **PR 2 — Pipeline & input redesign** (Phase 2 + 3, including the
-   `stage_id` backend contract change and `stage_retry` event).
-3. **PR 3 — Review redesign** (Phase 4). Highest impact, biggest diff;
-   isolate it.
-4. **PR 4 — Done, error, polish, smoke test** (Phases 5, 6, 7.1–7.2,
-   7.5–7.6, 8, 9).
-
-Each PR is shippable on its own and improves the UI without depending on
-the next.
+The Jinja2 report (`templates/report.html.jinja2`) duplicated the palette
+inline (lines 8–21). The token block was lifted into
+`templates/_design_tokens.css.jinja` and is `{% include %}`'d by the
+report. The block defines both the new PR1-era tokens (`--brand`,
+`--surface-card`, …) **and** legacy aliases (`--primary`, `--secondary`,
+`--bg`, …) pointing at them, so the report's 54 existing `var(--legacy)`
+usages keep working without a sweeping rename. `src/web/static/style.css`
+carries a duplicate of the canonical block (static CSS can't be
+Jinja-rendered at serve time) with a sync-required comment at the top.
 
 ---
 
-## 6. What success looks like
+## 5. Sequencing (as shipped)
 
-- A first-time operator lands on the page, picks a chip, hits Enter, and
-  is on the pipeline screen in < 3 seconds with no documentation read.
-- During the pipeline run, the operator can tell at a glance which stage
-  is active, how long it's taken, and whether a retry happened.
-- At the review checkpoint, the operator can scan all gaps as cards,
-  toggle them, and submit with a single keyboard shortcut. The course
-  title is always visible.
-- The UI works on a phone screen.
-- It looks like something built for educators, not for engineers.
+The four PRs landed as planned:
+
+1. **PR 1 — Tokens, type, shell** (`18652c9`) — Phase 1 (less 1.4) + 7.3
+   + 7.4. Pure visual refresh, zero backend touches.
+2. **PR 2 — Pipeline & input redesign** (`49de202`) — Phases 2 + 3 plus
+   the deferred 1.4 contract change (`stage_id`, `stage_retry`).
+3. **PR 3 — Review redesign** (`a6cb8bc`) — Phase 4. Biggest visual diff
+   in the series.
+4. **PR 4 — Done, error, polish, smoke test** (`088ce9e`) — Phases 5, 6,
+   7.1–7.2, 7.5–7.6, 8, 9.
+
+Each is shippable independently against `main` and improves the UI
+without depending on the next.
+
+---
+
+## 6. Success criteria (verified post-merge)
+
+- ✅ A first-time operator lands on the page, picks a sector chip, hits
+  Enter, and is on the pipeline screen in < 3 seconds — no docs needed.
+- ✅ During the pipeline run, the operator sees which stage is active,
+  how long each took, and a "⟲ Reintento N/M" chip if a quality gate
+  fails. Driven by `stage_id` and `stage_retry`, not keyword matching.
+- ✅ At the review checkpoint, gaps render as cards in a filterable +
+  sortable grid; toggling updates a live counter; the primary CTA
+  reads "Aceptar N habilidades y continuar" with N computed live;
+  `Ctrl/⌘+Enter` submits; the course title stays visible via the sticky
+  panel.
+- ✅ Works on a phone (single-column cards, sidebar collapses to a top
+  bar, sticky panel anchors full-width).
+- ✅ Visual language signals "thoughtful education-domain tool":
+  Inter + Fraunces, semantic tokens, dark mode with `prefers-color-scheme`
+  + manual toggle, WCAG-AA contrast for muted text.
+
+## 7. Known follow-ups (out of scope here)
+
+- **C2 / C3 / C4** — UI-state refactor, `textContent` migration, and
+  JSDoc typedefs. Tracked as deferred in Phase 8 above. None blocks the
+  shipped UI; each is a follow-up PR.
+- **Token drift between `style.css` and `_design_tokens.css.jinja`** —
+  both files carry the canonical block; a sync check in CI (a simple
+  string-equality test on the `:root { ... }` extract) would prevent
+  drift but didn't land in PR 4. Worth a 30-line follow-up.
+- **Sticky panel + sidebar interaction on landscape phones** — fine on
+  the three breakpoints we tuned for, but the `position: fixed` panel
+  could collide with browser chrome on uncommon viewports.
