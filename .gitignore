@@ -37,6 +37,21 @@ logs/
 *.swp
 *.swo
 
+# Tokens & secrets
+token.json
+
+# Databases (runtime-generated)
+*.db
+
+# Saved pipeline runs (large, user-specific)
+saved_runs/
+
+# Scratch / dev artifacts
+scratch/
+
+# Demo video (too large for git)
+*.webm
+
 # OS
 .DS_Store
 Thumbs.db
