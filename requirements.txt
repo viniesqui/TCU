@@ -31,3 +31,7 @@ python-dotenv>=1.0.0
 # Testing
 pytest>=8.0.0
 pytest-mock>=3.12.0
+
+# Auth
+passlib[bcrypt]>=1.7.4
+PyJWT>=2.8.0

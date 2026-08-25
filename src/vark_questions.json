@@ -1,0 +1,122 @@
+[
+  {
+    "id": 1,
+    "text": "Estás a punto de ensamblar un equipo técnico complejo. ¿Qué haces primero?",
+    "options": [
+      { "text": "Miro los diagramas e ilustraciones del manual.", "type": "visual" },
+      { "text": "Le pido a un compañero que me explique cómo hacerlo.", "type": "aural" },
+      { "text": "Leo detenidamente las instrucciones paso a paso.", "type": "reading" },
+      { "text": "Empiezo a armar las piezas para ver cómo encajan, aprendiendo sobre la marcha.", "type": "kinesthetic" }
+    ]
+  },
+  {
+    "id": 2,
+    "text": "Tienes un problema técnico con tu computadora. ¿Cómo prefieres resolverlo?",
+    "options": [
+      { "text": "Intento presionar teclas y probar cosas hasta solucionarlo.", "type": "kinesthetic" },
+      { "text": "Llamo a un amigo o al soporte técnico por teléfono.", "type": "aural" },
+      { "text": "Busco fotos o capturas de pantalla de la solución en internet.", "type": "visual" },
+      { "text": "Leo foros técnicos o artículos paso a paso.", "type": "reading" }
+    ]
+  },
+  {
+    "id": 3,
+    "text": "Necesitas aprender a usar una herramienta nueva en tu trabajo. ¿Qué formato te ayuda más?",
+    "options": [
+      { "text": "Un manual impreso, denso y con todos los detalles escritos.", "type": "reading" },
+      { "text": "Un video tutorial que me muestre qué hace cada cosa.", "type": "visual" },
+      { "text": "Que alguien se siente conmigo y me explique conversando.", "type": "aural" },
+      { "text": "Que me dejen probar la herramienta libremente.", "type": "kinesthetic" }
+    ]
+  },
+  {
+    "id": 4,
+    "text": "En una charla sobre prevención de riesgos laborales, prestas más atención a:",
+    "options": [
+      { "text": "Los folletos escritos y las normas documentadas.", "type": "reading" },
+      { "text": "El tono de voz del experto y sus anécdotas.", "type": "aural" },
+      { "text": "Las simulaciones prácticas o cuando piden voluntarios.", "type": "kinesthetic" },
+      { "text": "Los gráficos de estadísticas e infografías proyectadas.", "type": "visual" }
+    ]
+  },
+  {
+    "id": 5,
+    "text": "Para prepararte para un examen de certificación técnica, prefieres:",
+    "options": [
+      { "text": "Realizar exámenes de práctica o hacer simulacros en un laboratorio.", "type": "kinesthetic" },
+      { "text": "Dibujar mapas mentales, esquemas y usar diferentes colores.", "type": "visual" },
+      { "text": "Repasar resúmenes de texto y tomar notas extensas.", "type": "reading" },
+      { "text": "Estudiar en grupo debatiendo los temas o escuchar un audiolibro.", "type": "aural" }
+    ]
+  },
+  {
+    "id": 6,
+    "text": "Al buscar direcciones hacia el lugar de una entrevista de trabajo, prefieres:",
+    "options": [
+      { "text": "Pedirle a alguien que te diga exactamente por dónde cruzar.", "type": "aural" },
+      { "text": "Buscar un mapa y seguir la línea de la ruta trazada.", "type": "visual" },
+      { "text": "Anotar las instrucciones exactas: 'calle 5, dobla a la derecha, 200m'.", "type": "reading" },
+      { "text": "Caminar o manejar hasta llegar, guiándote por intuición de la ruta.", "type": "kinesthetic" }
+    ]
+  },
+  {
+    "id": 7,
+    "text": "Un profesor está evaluando una tarea práctica. Te gustaría recibir feedback mediante:",
+    "options": [
+      { "text": "Una nota escrita con los detalles de qué falló y por qué.", "type": "reading" },
+      { "text": "Una charla de retroalimentación donde podamos conversar.", "type": "aural" },
+      { "text": "Un esquema marcando claramente mis errores en el diseño o reporte.", "type": "visual" },
+      { "text": "Que me ponga frente al equipo y me corrija mientras lo repito.", "type": "kinesthetic" }
+    ]
+  },
+  {
+    "id": 8,
+    "text": "Cuando estás aprendiendo un tema financiero o matemático, lo entiendes mejor si:",
+    "options": [
+      { "text": "Me explican los conceptos verbalmente con ejemplos cotidianos.", "type": "aural" },
+      { "text": "Me muestran gráficos de barras y tablas visuales.", "type": "visual" },
+      { "text": "Puedo aplicar la fórmula resolviendo ejercicios prácticos por mí mismo.", "type": "kinesthetic" },
+      { "text": "Leo la definición y los teoremas detalladamente.", "type": "reading" }
+    ]
+  },
+  {
+    "id": 9,
+    "text": "En tu tiempo libre, quieres aprender sobre una nueva habilidad técnica. ¿Qué haces?",
+    "options": [
+      { "text": "Empiezo a hacer un pequeño proyecto de prueba.", "type": "kinesthetic" },
+      { "text": "Leo libros, blogs y documentación detallada.", "type": "reading" },
+      { "text": "Escucho un podcast o una entrevista a expertos del tema.", "type": "aural" },
+      { "text": "Veo tutoriales gráficos en YouTube y miro diagramas de flujo.", "type": "visual" }
+    ]
+  },
+  {
+    "id": 10,
+    "text": "Cuando tienes que organizar información importante para el trabajo, tú:",
+    "options": [
+      { "text": "Escribes listas punteadas y documentos de texto.", "type": "reading" },
+      { "text": "Usas una pizarra para armar diagramas y flujos lógicos.", "type": "visual" },
+      { "text": "Armas maquetas físicas o modelos rápidos.", "type": "kinesthetic" },
+      { "text": "Le explicas la idea a un compañero para estructurarla hablando.", "type": "aural" }
+    ]
+  },
+  {
+    "id": 11,
+    "text": "Si adquieres un dispositivo tecnológico totalmente innovador, tiendes a:",
+    "options": [
+      { "text": "Encenderlo y tratar de descubrir sus funciones probándolo.", "type": "kinesthetic" },
+      { "text": "Buscar un video que muestre sus capacidades gráficas.", "type": "visual" },
+      { "text": "Leer todas las especificaciones y el manual técnico.", "type": "reading" },
+      { "text": "Llamar a alguien que sepa para que te explique sus funciones.", "type": "aural" }
+    ]
+  },
+  {
+    "id": 12,
+    "text": "En un entorno de equipo, tomas mejores decisiones cuando:",
+    "options": [
+      { "text": "Tienes reportes detallados y escritos sobre la mesa.", "type": "reading" },
+      { "text": "Todos debaten verbalmente sus posturas y opiniones.", "type": "aural" },
+      { "text": "Pueden hacer prototipos y evaluar resultados tangibles.", "type": "kinesthetic" },
+      { "text": "Hay diapositivas o pizarras mostrando el impacto de cada opción.", "type": "visual" }
+    ]
+  }
+]

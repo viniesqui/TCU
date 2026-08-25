@@ -22,8 +22,9 @@ import uvicorn
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="TCU web UI server")
-    parser.add_argument("--host", default="127.0.0.1", help="Bind address (default: 127.0.0.1)")
-    parser.add_argument("--port", type=int, default=8765, help="Bind port (default: 8765)")
+    import os
+    parser.add_argument("--host", default=os.environ.get("HOST", "127.0.0.1"), help="Bind address")
+    parser.add_argument("--port", type=int, default=int(os.environ.get("PORT", 8765)), help="Bind port")
     parser.add_argument("--no-browser", action="store_true", help="Don't auto-open the browser")
     parser.add_argument("--verbose", action="store_true", help="Verbose logging")
     return parser.parse_args()
@@ -32,11 +33,17 @@ def parse_args() -> argparse.Namespace:
 def main() -> None:
     args = parse_args()
 
+    import os
+    os.makedirs("logs", exist_ok=True)
+    
     logging.basicConfig(
         level=logging.DEBUG if args.verbose else logging.INFO,
         format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
         datefmt="%H:%M:%S",
-        handlers=[logging.StreamHandler(sys.stdout)],
+        handlers=[
+            logging.StreamHandler(sys.stdout),
+            logging.FileHandler("logs/agent_activity.log")
+        ],
     )
     for noisy in ("httpx", "httpcore", "urllib3", "duckduckgo_search", "uvicorn.access"):
         logging.getLogger(noisy).setLevel(logging.WARNING)

@@ -9,8 +9,8 @@ class EvaluatorAgent(BaseAgent):
     Outputs: Evaluator (JSON)
     """
 
-    def __init__(self) -> None:
-        super().__init__(
+    def __init__(self, max_cost: float | None = None) -> None:
+        super().__init__(max_cost=max_cost, 
             name="EvaluatorAgent",
             system_prompt=EVALUATOR_PROMPT,
             tools=[],  # No tools — pure reasoning

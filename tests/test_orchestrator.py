@@ -29,7 +29,11 @@ def _make_industry_demand_json():
             {
                 "title": f"Developer {i}", "company": f"Co {i}",
                 "source_url": f"https://example.com/job{i}",
-                "required_skills": [], "preferred_skills": [],
+                "required_skills": [
+                    {"name": f"skill{j}", "category": "technical", "frequency_score": 1.0, "example_sources": []}
+                    for j in range(10)
+                ],
+                "preferred_skills": [],
                 "seniority": "mid", "location": "Costa Rica",
             }
             for i in range(5)
@@ -147,6 +151,9 @@ def mock_env(monkeypatch, tmp_path):
     """Set required environment variables and stub out the lru_cache so tests are isolated."""
     monkeypatch.setenv("ANTHROPIC_API_KEY", "test-key-for-unit-tests")
     monkeypatch.setenv("OUTPUT_DIR", str(tmp_path))
+    # Point the stage cache dir to a temporary path to isolate test runs
+    import src.agents.orchestrator
+    monkeypatch.setattr(src.agents.orchestrator, "_STAGE_CACHE_DIR", tmp_path / "stage_cache")
     # Clear the lru_cache so settings are freshly loaded with our env vars
     from src.config import get_settings
     get_settings.cache_clear()

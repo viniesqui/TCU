@@ -9,6 +9,14 @@ from unittest.mock import MagicMock, patch, call
 import pytest
 
 
+@pytest.fixture(autouse=True)
+def mock_search_cache(monkeypatch, tmp_path):
+    """Isolate search cache by using a temp directory for each test run."""
+    import src.tools.web_search
+    monkeypatch.setattr(src.tools.web_search, "_CACHE_DIR", tmp_path / "search_cache")
+    monkeypatch.setattr(src.tools.web_search, "_CACHE_FILE", tmp_path / "search_cache" / "web_search_cache.json")
+
+
 class TestWebSearch:
     def test_returns_json_list_on_success(self):
         mock_results = [

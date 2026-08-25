@@ -9,8 +9,8 @@ class GapAnalystAgent(BaseAgent):
     Outputs: GapAnalysis (JSON)
     """
 
-    def __init__(self) -> None:
-        super().__init__(
+    def __init__(self, max_cost: float | None = None) -> None:
+        super().__init__(max_cost=max_cost, 
             name="GapAnalystAgent",
             system_prompt=GAP_ANALYST_PROMPT,
             tools=[],  # No tools — pure reasoning

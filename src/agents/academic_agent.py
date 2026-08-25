@@ -15,8 +15,8 @@ class AcademicAgent(BaseAgent):
     Outputs: AcademicLandscape (JSON)
     """
 
-    def __init__(self) -> None:
-        super().__init__(
+    def __init__(self, max_cost: float | None = None) -> None:
+        super().__init__(max_cost=max_cost, 
             name="AcademicAgent",
             system_prompt=ACADEMIC_PROMPT,
             tools=RESEARCH_TOOLS,

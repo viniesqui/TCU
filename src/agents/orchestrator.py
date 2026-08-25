@@ -87,8 +87,40 @@ class Orchestrator:
     # Public interface
     # ------------------------------------------------------------------
 
+    def run_research(
+        self,
+        sector: str,
+        custom_academic_landscape: AcademicLandscape | None = None
+    ) -> tuple[IndustryDemand, AcademicLandscape, GapAnalysis]:
+        """Execute Stage 1-3. Returns (demand, academic, gap)."""
+        BaseAgent.reset_cost()
+        self._sector = sector
+        industry_demand = self._stage_market_research(sector)
+        if custom_academic_landscape is not None:
+            academic_landscape = custom_academic_landscape
+            self._save_stage_cache("academic_research", academic_landscape)
+        else:
+            academic_landscape = self._stage_academic_research(sector)
+        gap_analysis = self._stage_gap_analysis(industry_demand, academic_landscape)
+        return industry_demand, academic_landscape, gap_analysis
+
+    def run_course_design(self, gap_analysis: GapAnalysis) -> StudyPlan:
+        """Execute Stage 4 (Course Design). Returns StudyPlan."""
+        BaseAgent.reset_cost()
+        if not self._sector and gap_analysis.sector:
+            self._sector = gap_analysis.sector
+        return self._stage_course_design(gap_analysis)
+
+    def run_evaluator(self, study_plan: StudyPlan) -> Evaluator:
+        """Execute Stage 5 (Evaluator). Returns Evaluator."""
+        BaseAgent.reset_cost()
+        if not self._sector and study_plan.course_title:
+            self._sector = study_plan.course_title
+        return self._stage_evaluator(study_plan)
+
     def run(self, sector: str = "Desarrollo de Software") -> str:
         """Execute the full pipeline. Returns path to generated HTML report."""
+        BaseAgent.reset_cost()
         self._sector = sector
         logger.info(f"[Orchestrator] ── Pipeline start ── sector='{sector}'")
 
@@ -145,7 +177,7 @@ class Orchestrator:
             return cached
 
         gate = MarketResearchGate()
-        agent = LaborMarketAgent()
+        agent = LaborMarketAgent(max_cost=settings.max_cost_researcher)
         retry_context: str | None = None
 
         for attempt in range(1, self.max_retries + 2):
@@ -190,7 +222,7 @@ class Orchestrator:
             return cached
 
         gate = AcademicResearchGate()
-        agent = AcademicAgent()
+        agent = AcademicAgent(max_cost=settings.max_cost_researcher)
         retry_context: str | None = None
         broaden = False
 
@@ -251,7 +283,7 @@ class Orchestrator:
             return cached
 
         gate = GapAnalysisGate()
-        agent = GapAnalystAgent()
+        agent = GapAnalystAgent(max_cost=settings.max_cost_coordinator)
         demand_json = industry_demand.model_dump_json(indent=2)
         academic_json = academic_landscape.model_dump_json(indent=2)
         retry_context: str | None = None
@@ -296,14 +328,15 @@ class Orchestrator:
 
         curriculum_gate = CurriculumGate()
         activities_gate = ActivitiesGate()
-        agent = CourseDesignerAgent()
+        agent = CourseDesignerAgent(max_cost=settings.max_cost_coordinator)
         gap_json = gap_analysis.model_dump_json(indent=2)
         retry_context: str | None = None
 
         for attempt in range(1, self.max_retries + 2):
             logger.info(f"[Stage 4] Attempt {attempt}/{self.max_retries + 1}")
             try:
-                raw = agent.design(gap_json, retry_context=retry_context)
+                ref_mat = getattr(self, "_reference_material", None)
+                raw = agent.design(gap_json, retry_context=retry_context, reference_material=ref_mat)
                 result = StudyPlan.model_validate_json(BaseAgent.clean_json(raw))
             except (ValidationError, ValueError, json.JSONDecodeError) as e:
                 logger.warning(f"[Stage 4] Parse/validation error: {e}")
@@ -350,7 +383,7 @@ class Orchestrator:
             return cached
 
         gate = EvaluatorGate()
-        agent = EvaluatorAgent()
+        agent = EvaluatorAgent(max_cost=settings.max_cost_coordinator)
         full_json = study_plan.model_dump_json(indent=2, exclude={"evaluator"})
         retry_context: str | None = None
 

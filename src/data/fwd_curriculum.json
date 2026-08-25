@@ -1,0 +1,222 @@
+{
+  "institution": "FWD Costa Rica · Tech & Freedom",
+  "program_title": "Artificial Intelligence Systems and Solutions Engineering",
+  "course_title": "Programación Front End con Inteligencia Artificial Aplicada",
+  "duration_weeks": 13,
+  "start_date": "2026-07-13",
+  "end_date": "2026-10-09",
+  "hours_per_week": 40,
+  "total_days": 65,
+  "modality": "Presencial y Virtual",
+  "primary_ide": "Google Antigravity (IDE agéntico de desarrollo)",
+  "parallel_course": "Empleabilidad (Miércoles y Viernes)",
+  "methodology": {
+    "name": "Metodología de Lecciones de 45 Minutos",
+    "leads": ["Wendy", "Genny"],
+    "distribution": {
+      "programming_pure_days": 26,
+      "programming_pure_pct": "40%",
+      "ai_pure_days": 15,
+      "ai_pure_pct": "23%",
+      "hybrid_days": 21,
+      "hybrid_pct": "32%",
+      "margin_days": 3,
+      "margin_pct": "5%"
+    }
+  },
+  "instructors": {
+    "ai_lead": "Barry",
+    "programming_leads": ["Jeanka", "Steven"]
+  },
+  "axes": [
+    {
+      "name": "Eje 1: Programación Front End",
+      "modules": [
+        {
+          "module_number": 1,
+          "name": "Descubrimiento y Fundamentos",
+          "topics": [
+            "Lógica booleana y fundamentos de programación",
+            "Uso y comandos del CLI y sistema de archivos",
+            "Internet, protocolos y modelo cliente/servidor",
+            "HTML5, estructura semántica, anidación y DOM",
+            "CSS3, sintaxis, selectores, Box Model y especificidad",
+            "FlexBox y CSS Grid",
+            "Google Antigravity como IDE agéntico"
+          ]
+        },
+        {
+          "module_number": 2,
+          "name": "Introducción a JavaScript y Trabajo en Equipo",
+          "topics": [
+            "Pensamiento lógico y diagramas de flujo",
+            "Tipos de datos, variables, funciones, condicionales y bucles",
+            "Manejo de Window Objects y convención camelCase",
+            "Metodologías ágiles y Scrum",
+            "GitHub colaborativo: ramas, commits, pull requests y buenas prácticas"
+          ]
+        },
+        {
+          "module_number": 3,
+          "name": "JavaScript a Fondo",
+          "topics": [
+            "Ecosistema JS, npm, paquetes y herramientas",
+            "Scope, Shadowing, Class, this",
+            "Funciones de orden superior: map, filter, reduce",
+            "Asincronía, promesas, async/await",
+            "Módulos ES6: import/export, desestructuración y manejo de errores"
+          ]
+        },
+        {
+          "module_number": 4,
+          "name": "React",
+          "topics": [
+            "Fundamentos de React, JSX y empaquetadores (Vite)",
+            "Renderizado, Virtual DOM y componentes funcionales",
+            "Manejo de estado (useState, useEffect)",
+            "Custom Hooks y optimización",
+            "Rutas públicas y privadas con react-router-dom",
+            "Consumo de APIs RESTful en React"
+          ]
+        },
+        {
+          "module_number": 5,
+          "name": "Proyecto Final de React",
+          "topics": [
+            "Desarrollo de aplicación web completa escalable",
+            "Levantamiento y desarrollo de requerimientos",
+            "Consumo de APIs y base de datos simulada",
+            "Integración opcional de agente de IA o n8n"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Eje 2: Inteligencia Artificial Aplicada",
+      "modules": [
+        {
+          "module_number": 1,
+          "name": "Fundamentos de Inteligencia Artificial Aplicada",
+          "topics": [
+            "Introducción a la IA Generativa y modelos LLM (Claude, OpenAI, modelos open source)",
+            "Comparación de modelos y selección según caso de uso",
+            "Skills en Claude (SKILL.md, YAML frontmatter, portabilidad, skill-creator)"
+          ]
+        },
+        {
+          "module_number": 2,
+          "name": "Ingeniería de Contexto (Context Engineering)",
+          "topics": [
+            "Estructuración de contexto para modelos de lenguaje",
+            "Información relevante vs ruido, errores comunes y mejores prácticas",
+            "Despliegue (Deploy) de sistemas desarrollados con IA, variables de entorno y SSL"
+          ]
+        },
+        {
+          "module_number": 3,
+          "name": "Ingeniería de Prompts",
+          "topics": [
+            "Diseño de prompts efectivos, restricciones y ejemplos (Few-shot)",
+            "Iteración, refinamiento y optimización de respuestas para código"
+          ]
+        },
+        {
+          "module_number": 4,
+          "name": "Markdown como Memoria de la IA",
+          "topics": [
+            "Markdown como memoria estructurada de agentes",
+            "Organización de reglas, restricciones, objetivos y documentación técnica"
+          ]
+        },
+        {
+          "module_number": 5,
+          "name": "Levantamiento de Requerimientos con IA",
+          "topics": [
+            "Comprensión de problemas y transformación en requerimientos estructurados"
+          ]
+        },
+        {
+          "module_number": 6,
+          "name": "Investigación Inteligente y Notebook LM",
+          "topics": [
+            "Carga de fuentes y creación de bases de conocimiento con Notebook LM",
+            "Consultas contextuales para acelerar proyectos de software"
+          ]
+        },
+        {
+          "module_number": 7,
+          "name": "Vibe Coding",
+          "topics": [
+            "Principios de Vibe Coding y prototipado rápido en Google Antigravity",
+            "Validación con criterio técnico sobre código autogenerado"
+          ]
+        },
+        {
+          "module_number": 8,
+          "name": "Automatización con IA y n8n",
+          "topics": [
+            "Conceptos de automatización de workflows con n8n",
+            "Integración de n8n con APIs y modelos de IA",
+            "Automatización empresarial (Mercadeo, Finanzas, RRHH, Ventas, Soporte)"
+          ]
+        },
+        {
+          "module_number": 9,
+          "name": "Desarrollo de Agentes de IA y su Ciclo de Vida",
+          "topics": [
+            "Arquitectura de agentes: memoria, tools, skills, funciones",
+            "Ciclo de vida: recepción, planificación, ejecución de herramientas e iteración"
+          ]
+        },
+        {
+          "module_number": 10,
+          "name": "Agentes para Aplicaciones y Multiagentes",
+          "topics": [
+            "Integración de agentes en aplicaciones Front-End (React)",
+            "Multiagentes: comunicación inter-agente y distribución de tareas",
+            "Experiencias de usuario impulsadas por agentes (Agentic UX)"
+          ]
+        },
+        {
+          "module_number": 11,
+          "name": "Resolución de Problemas y Buenas Prácticas con IA",
+          "topics": [
+            "Selección de herramientas y múltiples modelos",
+            "Gestión de memoria, documentación continua y calidad en soluciones de IA"
+          ]
+        }
+      ]
+    }
+  ],
+  "all_skills_covered": [
+    "html5",
+    "css3",
+    "flexbox",
+    "css-grid",
+    "javascript-es12",
+    "async-await",
+    "promises",
+    "react",
+    "react-hooks",
+    "custom-hooks",
+    "react-router-dom",
+    "rest-api-consumption",
+    "git",
+    "github",
+    "agile-scrum",
+    "cli-bash",
+    "prompt-engineering",
+    "context-engineering",
+    "claude-skills",
+    "markdown-agent-memory",
+    "vibe-coding",
+    "google-antigravity",
+    "n8n-workflow-automation",
+    "notebooklm",
+    "ai-agents-architecture",
+    "multi-agent-orchestration",
+    "agentic-ux",
+    "deploy-and-env-management"
+  ],
+  "summary": "Programa integral de 13 semanas desarrollado por FWD Costa Rica enfocado en Programación Front End moderna (React, JS, HTML5, CSS3) e Inteligencia Artificial Aplicada (Vibe Coding, Context & Prompt Engineering, n8n, Agentes Autónomos y Multiagentes en Google Antigravity), con metodología de lecciones de 45 minutos y módulo de empleabilidad."
+}
